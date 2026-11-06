@@ -1,0 +1,8 @@
+#N canvas 470 346 328 221 10;
+#X obj 40 60 vu 12 120 \$1-vu-out empty -12 -8 0 7 #404040 #000000 0 0;
+#X obj 18 60 vsl 20 119 0 127 0 0 \$1-vol-r \$1-vol-s 127 2 130 0 8 #404040 #ffffff #000000 0 1;
+#X obj 64 78 tgl 15 0 \$1-compressor-r \$1-compressor-s comp 0 22 0 9 #dfdfdf #ff0400 #000000 0 1;
+#X obj 65 113 tgl 15 0 \$1-out-rec-s \$1-out-rec-r rec 0 22 0 9 #ffc7c6 #ff0400 #000000 0 1;
+#X obj 65 147 bng 15 250 50 0 \$1-st0-out-s \$1-st0-out-r st0 0 22 0 9 #dfdfdf #ff0400 #000000;
+#X obj 23 18 cnv 15 30 15 empty \$1-out OUT\ \$1 5 8 0 14 #ffffff #202020 0;
+#X coords 0 -1 1 1 80 190 2 10 10;

@@ -1,0 +1,18 @@
+#N canvas 437 232 275 316 12;
+#X obj 45 15 r~ \$1-mix, f 18;
+#X obj 60 54 s~ fm-\$1;
+#X obj 44 259 throw~ ch-\$1;
+#X obj 44 222 *~ 1;
+#X obj 72 113 hsl 162 19 0 127 0 0 no-mast empty empty -2 -10 0 12 #dfdfdf #000000 #000000 0 1;
+#X floatatom 69 195 12 0 0 0 - - - 0;
+#X obj 69 167 pow 2;
+#X obj 69 143 / 127;
+#X obj 69 85 r \$1-kb-1;
+#X connect 0 0 1 0;
+#X connect 0 0 3 0;
+#X connect 3 0 2 0;
+#X connect 4 0 7 0;
+#X connect 5 0 3 1;
+#X connect 6 0 5 0;
+#X connect 7 0 6 0;
+#X connect 8 0 4 0;
