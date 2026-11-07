@@ -81,7 +81,7 @@ Select Media - Midi Settings...
 ### Select manual or automatic fader/knob movements
 
 Switch between manual (0) and automatic (1).
-(With no Akai MidiMix the select the automatic movments of the fader.)
+(With no Akai MidiMix select the automatic movements of the fader.)
 
 ### Amplification of the instruments
 
