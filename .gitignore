@@ -1,9 +1,10 @@
-.DS_Store
+# ignore audio files
 *.wav
 *.aif
 *.aiff
 *.flac
 
+# ignore specific LISP related files
 *.FASL
 *.fasl
 *.lisp-temp
@@ -21,3 +22,17 @@
 *.sx32fsl
 *.wx64fsl
 *.wx32fsl
+
+# ignore mac desktop files
+*.DS_Store
+.DS_Store
+
+# ignore temporary Opusmodus files
+*.opmo~
+
+# ignore temporary Reaper files
+*.RPP-bak
+*..reapeaks
+
+# ignore lib directories
+lib/
