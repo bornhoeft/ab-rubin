@@ -17,7 +17,9 @@ Made with [Pure Data](https://puredata.info) (PD-vanilla, Version PD-0.56-2)<br>
 
 ### Installation / Setup
 
-Download Pure Data Vanilla from [https://puredata.info/downloads/pure-data](https://puredata.info/downloads/pure-data)
+- Download Pure Data Vanilla from [https://puredata.info/downloads/pure-data](https://puredata.info/downloads/pure-data)
+- Download the newest version of the patch from [https://github.com/bornhoeft/ab-rubin/releases](https://github.com/bornhoeft/ab-rubin/releases)
+
 ### Open Patch 
 Open @main.pd in Puredata
 
