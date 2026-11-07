@@ -18,7 +18,8 @@ Made with [Pure Data](https://puredata.info) (PD-vanilla, Version PD-0.56-2)<br>
 ### Installation / Setup
 
 - Download Pure Data Vanilla from [https://puredata.info/downloads/pure-data](https://puredata.info/downloads/pure-data)
-- Download the newest version of the patch from [https://github.com/bornhoeft/ab-rubin/releases](https://github.com/bornhoeft/ab-rubin/releases)
+- Download the newest version of the patch including the Audio.zip archive from [https://github.com/bornhoeft/ab-rubin/releases](https://github.com/bornhoeft/ab-rubin/releases)
+- Extract the audio files and place them in the "tracks" subdirectory
 
 ### Open Patch 
 Open @main.pd in Puredata
@@ -80,6 +81,7 @@ Select Media - Midi Settings...
 ### Select manual or automatic fader/knob movements
 
 Switch between manual (0) and automatic (1).
+(With no Akai MidiMix the select the automatic movments of the fader.)
 
 ### Amplification of the instruments
 
