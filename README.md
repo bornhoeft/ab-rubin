@@ -8,7 +8,7 @@ Achim Bornhoeft © 2026<br>
 
 ## TOC
 
-- [Live Electronics](#live electronics)
+- [Live Electronics](#live-electronics)
 - [Computercomposition](opmo/Rubin.md)
 
 ## Live Electronics
