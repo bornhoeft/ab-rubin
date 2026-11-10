@@ -1,0 +1,20 @@
+("workspace-view/layout-ratios"
+ (1 (OM-CAPI::MAIN 240 NIL 812) (OM-CAPI::EDITOR-AND-LISTENER-LAYOUT 1219 NIL 127))
+)
+
+("workspace-view/history"
+ (("score.opmo" "score.opmo"))
+)
+
+("workspace-view/node-documents"
+ NIL
+)
+
+("workspace-view/current"
+ "score.opmo"
+)
+
+("workspace-view/navigator-display-states"
+ ((:USER-LIBRARIES NIL NIL NIL) (:USER-MEDIA NIL NIL NIL) (:USER-DOCUMENTS NIL NIL NIL) (:USER-SCORES NIL NIL NIL) (:USER-WORKSPACE NIL #P"/Users/bornhoeft/Documents/code/github/ab-rubin/opmo/functions/" 0))
+)
+
