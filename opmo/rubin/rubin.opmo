@@ -1,0 +1,805 @@
+;;; --------------------------------------------------------
+;;;  Achim Bornhoeft
+;;;  New piece for NAMES Ensemble and/or Ensemble Phorminx
+;;;  (c) 2024 - 2026
+;;; --------------------------------------------------------
+
+;; Initial seed evaluating the whole document/buffer
+(init-seed 12358)
+
+;; Voices ids from high (0) to low (8)
+(setf number-voices 
+      (length (list
+        (setf vn-high-id 0)     ; Violin high
+        (setf b-fl-id 1)        ; Flute
+        (setf vn-low-id 2)      ; Violin low
+        (setf eorg-high-id 3)   ; E-Organ high (chords)
+        (setf b-cl-id 4)        ; (Bass-)Clarinet
+        (setf ebow-id 5)        ; E-Bows
+        (setf vc-high-id 6)     ; Violoncello high
+        (setf vc-low-id 7)      ; Violoncello low
+        (setf eorg-low-id 8)    ; E-Organ low
+        (setf pno-high-id 9)    ; Piano high
+        (setf pno-chord-id 10)  ; Piano chords
+        (setf pno-low-id 11)    ; Piano low
+        (setf vibr-id 12))))    ; Vibraphone
+;;; --------------------------------------------------------
+;;; Variable-length list of ratios with fixed sum, fixed
+;;; minimum and maximum, snapped to a quantize grid
+;;;
+;;; see: https://claude.ai/artifact/JnUzXZ3zWWG1xYc6FnqbHa
+;;; --------------------------------------------------------
+
+(defun grid-unit (quantize)
+  "Smallest common time unit of a QUANTIZE list.
+'(1 2 4) => 1/4, '(1 2 4 8) => 1/8, '(1 2 3) => 1/6."
+  (/ 1 (reduce #'lcm quantize)))
+
+(defun fix-rounding (values total &key (quantize '(1 2 4))
+                            min max)
+  "Scales VALUES (ratios) so their sum is TOTAL, snaps every
+value to the grid given by QUANTIZE and distributes the
+rounding remainder, so that the sum is EXACTLY TOTAL --
+one grid unit at a time, first where the rounding error was
+largest, and only within MIN ... MAX.
+MIN/MAX are ratios; MIN defaults to one grid unit, so no
+value can collapse to zero.
+Ex.:
+ (fix-rounding '(1/4 1/8 1/4 3/4 1 3/8) 4
+               :quantize '(1 2 4))
+ => (1/2 1/4 1/4 1 3/2 1/2)
+ (fix-rounding '(1/4 1/8 1/4 3/4 1 3/8) 4
+               :quantize '(1 2 4 8))
+ => (3/8 1/8 3/8 9/8 3/2 1/2)"
+  (let* ((unit  (grid-unit quantize))
+         (steps (round (/ total unit)))
+         (lo    (if min (max 1 (ceiling (/ min unit))) 1))
+         (hi    (if max (floor (/ max unit)) steps))
+         (raw   (let ((s (reduce #'+ values)))
+                  (mapcar (lambda (x)
+                            (/ (* x total) s unit))
+                          values)))
+         (n     (length raw))
+         (ints  (mapcar (lambda (x)
+                          (min hi (max lo (floor x))))
+                        raw)))
+    (assert (<= (* n lo) steps (* n hi)) (total)
+      "~a units cannot be split into ~a values ~
+             between ~a and ~a units."
+      steps n lo hi)
+    (loop for rest = (- steps (reduce #'+ ints))
+          for moved = 0
+          while (/= rest 0)
+          do (let ((err (mapcar #'- raw ints)))
+               (loop for i in (sort (loop for k from 0
+                                            below n
+                                          collect k)
+                                    (if (plusp rest)
+                                        #'> #'<)
+                                    :key (lambda (k)
+                                           (nth k err)))
+                     while (/= rest 0)
+                     do (let ((d (if (plusp rest) 1 -1)))
+                          (when (<= lo (+ (nth i ints) d)
+                                    hi)
+                            (incf (nth i ints) d)
+                            (decf rest d)
+                            (incf moved))))
+               (when (zerop moved)
+                 (error "~a units left over -- MIN/MAX ~
+                         block any further correction."
+                        rest))))
+    (mapcar (lambda (i) (* i unit)) ints)))
+
+(defun check-sum-range (n total min max quantize)
+  "Early check, if the target sum reachable at all? 
+fails before the bisection is run, and reports the 
+reachable range in ratios rather than in units."
+  (let* ((unit  (grid-unit quantize))
+         (lo    (max 1 (ceiling (/ min unit))))
+         (hi    (floor (/ max unit)))
+         (steps (round (/ total unit))))
+    (assert (<= (* n lo) steps (* n hi)) (total)
+      "Sum ~a not reachable: ~a values from ~a to ~a ~
+             on a ~a grid give ~a ... ~a."
+      total n min max unit
+      (* n lo unit) (* n hi unit))))
+
+(defun fit-sum (n total &key (min 1/8) (max 1)
+                  (quantize '(1 2 4 8)) shape)
+  "N ratios with sum TOTAL, smallest value MIN, largest
+value MAX, all lying on the QUANTIZE grid.
+SHAPE is any contour of length N;
+default: (half-sine n 1 :phase 180)."
+  (check-sum-range n total min max quantize)
+  (let* ((raw (or shape (half-sine n 1 :phase 180)))
+         (a (reduce #'min raw))
+         (b (reduce #'max raw))
+         (s (if (= a b)
+                (make-list n :initial-element 0.5d0)
+              (mapcar (lambda (x)
+                        (coerce (/ (- x a) (- b a))
+                                'double-float))
+                      raw)))
+         (curve (lambda (g)
+                  (mapcar (lambda (x)
+                            (+ min (* (- max min)
+                                      (expt x g))))
+                          s)))
+         (gamma (let ((g1 1d-4) (g2 1d4))
+                  (dotimes (i 200 (sqrt (* g1 g2)))
+                    (let ((m (sqrt (* g1 g2))))
+                      (if (> (reduce #'+ (funcall curve m))
+                             total)
+                          (setf g1 m)
+                        (setf g2 m)))))))
+    (fix-rounding (funcall curve gamma) total
+                  :quantize quantize :min min :max max)))
+
+;;; --------------------------------------------------------
+;;; Durations
+;;; --------------------------------------------------------
+
+;; Number of events per voice
+(setf events 100)
+
+;; Vector data: short - long - short
+(list-plot
+(setf length-vector
+      (half-sine events 1 :phase 180))
+:join-points t)
+
+;; Vifferent variances for each voice
+(setf variances '(0.5 ; Violin high
+                  0.7 ; Flute 
+                  0.4 ; Violin low
+                  1.0 ; E-Organ chords
+                  0.7 ; (Bass-)Clarinet
+                  0.2 ; E-Bows
+                  0.5 ; Violoncello high
+                  0.4 ; Violoncello low
+                  0.1 ; E-Organ low
+                  1.2 ; Piano high
+                  0.9 ; Piano chords
+                  0.3 ; Piano low
+                  0.6 ; Vibraphone
+                  ))
+
+;; Calculate lengths for all voices with
+;; different deviations/variances.
+;; Preview with cmd-2.
+(list-plot
+ (setf durations
+       (loop
+          with seed = (init-seed 311)
+          for var in variances
+          repeat number-voices
+          collect
+            (fit-sum events 200 
+                     :quantize '(1 2 4 8 16) 
+                     :min 1/2 ; (rnd-pick '(1/2 3/4))
+                     :max 3 ; (rnd-pick '(3 5/2))
+                     :shape (vector-map 
+                             (gen-tendency
+                              events
+                              (gen-integer 1 events)
+                              :variance var)
+                             (half-sine events 1 
+                                        :phase 180)))))
+ :join-points t)
+
+;; Number of events after which the pitches of ALL voices
+;; change at the same time, see pitch-preview below:
+;; '(15 10 17 3 3)
+
+;; Define number of events (4 to 30) for each part (6)
+(setf parts-list
+'(15 10 17 3 3 4 17 3 10 3 15))
+;; (find-sum parts-list)
+
+;; Collect durations in parts from events
+(setf all-parts
+;; collect all voices of each part in one list
+      (matrix-transpose
+       (loop for i in durations
+       ;; divide each voice into sublists (parts)
+             collect (gen-divide parts-list i))))
+
+;; Compare all voices per part and extend them
+;; to the longest one by adding rests to it.
+;; Preview with cmd-2.
+(setf voices-fit
+;; reduce to one list per voice
+;; convert to voices in parts as sublists
+      (matrix-transpose
+ ;; loop in all voices of each part
+       (loop for i in all-parts
+       ;; trim all voices to the longest part
+       ;; and fit them in a 4/4 measure grid
+             collect
+               (loop with span-val =
+                 ;; round the longest voice to the
+                 ;; next higher integer
+                 ;; = next 4/4 measure
+                       (ceiling
+                  ;; find the largest number
+                  ;; = longest voice
+                        (find-max
+                   ;; get the span for each
+                   ;; voice in each part
+                         (get-span i)))
+                     for j in i
+                     collect
+                       (quantize
+                  ;; fit to the longest voice
+                  ;; by adding rests at the end
+                        (fit-to-span span-val j)
+                        '(1 2 4) :type :ratio)))))
+
+;; Collect the durations and rests for each part and each
+;; voice independently in different sublists to calculate
+;; shorter rests between the individual durations.
+(setf plus-minus-sublists
+      (loop for i in voices-fit
+            collect
+              (loop for j in i
+                    collect
+                      (loop for k in j
+                            if (plusp k)
+                              collect k into plusres
+                            else collect k into minres
+                            finally
+                              (return
+                               (list plusres minres))))))
+
+;; Vector for the rests between the durations.
+; (list-plot
+(setf rests-vector
+;; part-list = number of durations per part
+      (let ((res (-
+            ;; sum of all durations
+                  (find-sum parts-list)
+            ;; minus the last durations per part
+            ;; = one per part = length of parts-list
+                  (length parts-list))))
+        (half-sine res 1 :phase 180)))
+; :join-points t)
+
+;; Map vector to selection of rests in ratios
+;; 3/8 => 0 => 3/8 in sinusodial shape
+(setf rests
+      (gen-divide
+ ;; number of durations per part - last duration
+       (mapcar #'1- parts-list)
+ ;; lengths for the rest
+       (vector-map '(0 1/16 1/8 3/16 1/4 3/8)
+                   rests-vector)))
+
+;; Add rests to all durations but the last in each part of
+;; each voice and combine:
+;; durations but last + rests / last duration / rests
+(setf lengths
+      (loop for i in plus-minus-sublists
+            collect
+              (loop for j in i
+                    for re in rests
+                    collect
+                      (quantize
+                      (remove
+                       0
+                       (loop for k in (butlast (first j))
+                             for r in re
+                             append
+                               (list (- k r) (* -1 r))
+                               into reslis
+                             finally
+                               (return
+                                (flatten
+                                 (list reslis
+                                       (last (first j))
+                                       (second j))))))
+      '(1 2 4) :type :ratio))))
+
+;;; --------------------------------------------------------
+;;; Pitch material
+;;;
+;;; All notes on a piano which frequencies are <= 6 cents
+;;; from the pitches of a harmonic series on g-1, starting
+;;; from the 4. harmonic, including the empty strings of
+;;; violoncello '(g2 d3 a3) and violon (g3 d4 a4 e5).
+;;; --------------------------------------------------------
+
+;; Start overtone
+(setf start-id 4)
+
+;; harmonic row on fundamental 12.249859 hz starting from
+;; the 4. overtone
+(setf harmonic-row
+        (harmonics
+         (/ (pitch-to-hertz 'g0) 2) 181 :start start-id))
+
+;; Semitones (chromatic scale) only
+(setf semitones (hertz-to-midi harmonic-row
+                                 :quantize 1/2))
+
+;; Remaining cents
+(setf remain-cents
+        (hertz-to-midi harmonic-row
+                       :quantize 1/2 :remain t))
+
+;; Collect only midis (and its corresponding harmonic
+;; index) with equal or lower deviation of 6 cents from
+;; the chromatic scale
+(setf harm-midis
+        (loop for id from start-id ; harmonic index
+              for sem in semitones
+              for remc in remain-cents
+              when (<= (abs remc) 6)
+                collect (list id sem remc)))
+
+;; 33 pitches on the piano which are max <= 6 cent
+;; different to the chromatic scale from g-1 between
+;; the 4. (g1) and the 181. overtone (cs7)
+(setf pitch-mat (midi-to-pitch
+                   (second
+                    (matrix-transpose harm-midis))))
+
+(setf cents
+        (cent-to-attribute
+         (third (matrix-transpose harm-midis))))
+
+;; Pitch material, preview with cmd-1
+  (make-omn
+   :pitch pitch-mat
+   :length '(w)
+   :articulation cents
+   :span :pitch)
+
+;;; --------------------------------------------------------
+;;; Pitches in voices
+;;;
+;;; see: https://claude.ai/artifact/Kqc9yXSK2ryMrAwwFgoNrs
+;;; --------------------------------------------------------
+
+(defun spread-develop (len env &key (variance 0.0)
+                           steps round seed)
+  "Develops a list of length LEN along an xy envelope.
+ENV '(x1 y1 x2 y2 …): x = step index, y = spread factor.
+By default one row per integer x step; STEPS overrides that
+count, and the x values then act as mere proportions.
+VARIANCE: a number, or its own xy envelope -- it is
+resampled to the same count, so its x range does not matter.
+Ex.: (spread-develop 5 '(0 0 5 2 12 3 15 1 20 0) :round t)
+(spread-develop 5 '(0 0 1 2 2.4 3 3 1 4 0) :steps 40)"
+  (let* ((base  (gen-integer 0 (1- len)))
+         (n     (or steps (1+ (- (car (last env 2))
+                                 (first env)))))
+         (curve (envelope-y (envelope-samples env n)))
+         (vars  (if (listp variance)
+                    (envelope-y
+                     (envelope-samples variance n))
+                  (make-list n
+                             :initial-element variance)))
+         (noise (rnd-number n -1.0 1.0 :seed seed)))
+    (loop for f in curve
+          for v in vars
+          for r in noise
+          for d = (+ 1.0 (* v r))
+          for row = (mapcar (lambda (y) (* y f d)) base)
+          collect (if round (mapcar #'round row) row))))
+
+;; Transposition envelope as offset
+;; for the chord progession
+(setf transp-env'(0 2 10 2 20 3 30 4 40 3 50 6
+                       60 4 70 0 80 3 90 1 100 2))
+
+  (list-plot
+ ;; List of integer transpositions according to the
+ ;; number of events
+ (setf transp
+         (mapcar #'round
+                 (envelope-y
+                  (envelope-samples transp-env events))))
+   :join-points t)
+
+;; Developement of selections from the pitch material
+;; (0 0 0 0 0 0 0 0 0) = unison
+;; (0 1 2 3 4 5 6 7 8) = successive pitches in scale
+;; (0 2 4 6 8 10 12 14 16) = every second pitch in scale
+(setf spread
+        (spread-develop
+         9 '(0 0 30 1 70 4 100 1) 
+         :steps events 
+         :round t
+         :variance 0.02))
+
+;; Add transposition to it
+(setf indexes
+        (loop for i in transp
+              for j in spread
+              collect (integer-transpose i j)))
+
+;; Convert to voices from high to low
+(list-plot
+ (setf voice-ids
+       (reverse
+        (matrix-transpose
+         indexes)))
+ :join-points t)
+
+;; --------------------------------------------------------
+;; ID lists for PD sequencing files
+;; --------------------------------------------------------
+
+;; Group all freqency multipliers in parts
+(setf harm-ids-parts
+      (loop for i in voice-ids
+            collect
+              (gen-divide parts-list i)))
+
+;; Double all pitches and triple the last of each section
+;; (200 measures + 11 times 1 = 211 measures
+(setf harm-ids-ext
+      (loop for i in harm-ids-parts
+            collect
+              (loop for j in i
+                    append
+                      (append 
+                       (loop for d in j
+                             append (append (list d d)))
+                       (last j)))))
+
+;; CUT measures 1 - 106 and 107 - 211 with gen-divide
+;; Insert 15 measures with the number of 106
+(setf harm-ids-add
+      (loop for i in harm-ids-ext
+            for j = (gen-divide '(106 105) i)
+            collect  (append (first j)
+                             (gen-repeat 
+                              15 
+                              (first 
+                               (last (first j))))
+                             (second j))))
+    
+;; Write harm-id-lists to textfiles
+(loop for i in harm-ids-add
+      for ch-no from 1
+      do (with-open-file 
+             (stream 
+              (merge-pathnames 
+               (make-pathname
+                :directory (list :relative 
+                                 (format nil "Desktop/"))
+                :name (format nil "ch-~a" ch-no) :type "txt")
+               (user-homedir-pathname))
+              :direction :output
+              :if-exists :new-version)
+           (format stream  
+                   (format nil "~{~a~^; ~}~%" i))))
+
+;; --------------------------------------------------------
+
+;; Pitches for 9 voices divided in parts
+(setf pitches
+      (loop for i in voice-ids
+            collect
+              (gen-divide parts-list 
+              (loop for j in i
+                    collect (nth j pitch-mat)))))
+
+;; Preview with cmd-2, algorithmic length structure
+(setf voices
+      (loop for i in pitches
+            for j in lengths
+            collect (make-omn
+               :pitch i
+              :length j)))
+
+;; --------------------------------------------------------
+;; Score for 8channel playback
+;; --------------------------------------------------------
+
+(setf pitches-ext
+      (loop for i in pitches
+            collect
+              (loop for j in i
+                    append
+                      (append 
+                       (loop for d in j
+                             append (append (list d d)))
+                       (last j)))))
+
+;; Preview with cmd-2, tied with single duration (w) 
+(setf pitch-preview
+        (make-omn
+         :pitch pitches-ext
+         :length '(w)
+         :articulation '(tie)
+         :span :pitch))
+
+;;; --------------------------------------------------------
+;;; (Bass-)Flute
+;;; --------------------------------------------------------
+
+;; (integer-to-pitch (ambitus-instrument 'flute))
+(setf fl (ambitus-filter '(e4 cs7)
+                      (make-omn
+                       :length (nth b-fl-id lengths)
+                       :pitch (nth b-fl-id pitches)
+                       :velocity '((p)))))
+
+;; (integer-to-pitch (ambitus-instrument 'bass-flute))
+(setf bfl
+        (ambitus-filter '(c3 eb4)
+                        (make-omn
+                         :length (nth b-fl-id lengths)
+                         :pitch (nth b-fl-id pitches)
+                         :velocity '((p)))))
+
+;;; --------------------------------------------------------
+;;; (Bass-)Clarinet
+;;; --------------------------------------------------------
+
+;; (integer-to-pitch (ambitus-instrument 'clarinet))
+(setf cl
+      (ambitus-filter '(gs4 f6)
+                      (make-omn
+                       :length (nth b-cl-id lengths)
+                       :pitch (nth b-cl-id pitches)
+                       :velocity '(p))))
+
+;; (integer-to-pitch (ambitus-instrument 'bass-clarinet))
+(setf bcl
+      (ambitus-filter '(g2 g4)
+                      (make-omn
+                       :length (nth b-cl-id lengths)
+                       :pitch (nth b-cl-id pitches)
+                       :velocity '(p))))
+
+;;; --------------------------------------------------------
+;;; Vibraphone
+;;; --------------------------------------------------------
+
+(setf vibraphone-chords
+      (mcflatten
+      (matrix-transpose
+        (loop for i in (nth vn-low-id voice-ids)
+              collect
+                (respell
+                 (chordize
+                  (gen-divide 2
+                  (loop repeat 4
+                        for x from i
+                        collect (nth x pitch-mat)))))))))
+
+(setf vibr-low
+      (ambitus-filter 'vibraphone
+                      (make-omn
+                       :length (nth vibr-id lengths)
+                       :pitch (first vibraphone-chords)
+                       :velocity '(p))))
+
+(setf vibr-high
+      (ambitus-filter 'vibraphone
+                      (make-omn
+                       :length (nth vibr-id lengths)
+                       :pitch (second vibraphone-chords)
+                       :velocity '(p))))
+
+;;; --------------------------------------------------------
+;;; E-Bow
+;;; --------------------------------------------------------
+
+(setf ebow
+      (filter-tie
+      (length-legato
+       ;; Change to avoid impossible minor seconds
+       (tonality-map '((g3 a3 d4 e4 g4 a4))
+       (ambitus-filter '(d3 a4)
+                       (make-omn
+                        :length (flatten
+                                 (nth ebow-id lengths))
+                        :pitch (nth ebow-id pitches)
+                         :velocity '(p)))))))
+
+;;; --------------------------------------------------------
+;;; Piano 
+;;; --------------------------------------------------------
+
+(setf pno-high 
+      (ambitus-filter '(e4 c8)
+                      (make-omn
+                :length (nth pno-high-id lengths)
+                :pitch (nth b-fl-id pitches)
+                :velocity '(p))))
+
+(setf piano-chords
+        (loop for i in (nth b-cl-id voice-ids)
+              append
+                (respell
+                 (chordize
+                  (loop repeat 3
+                        for x from i by 2
+                        collect (nth x pitch-mat))))))
+
+(setf pno-chord
+        (make-omn
+         :length (nth pno-chord-id lengths)
+         :pitch piano-chords
+         :velocity '(p)))
+
+;; see: https://www.youtube.com/watch?v=nriR1UpdqmM
+(setf pno-low (make-omn
+               :length (nth pno-low-id lengths)
+               :pitch (nth eorg-low-id pitches)
+               :velocity '(p)))
+
+;;; --------------------------------------------------------
+;;; E-Organ
+;;; --------------------------------------------------------
+
+(setf eorg-int-high
+        (loop for i in (nth eorg-high-id voice-ids)
+              append
+                (respell
+                 (chordize
+                  (loop repeat 2
+                        for x from i by 2
+                        collect (nth x pitch-mat))))))
+
+
+(setf eorg-high
+      (ambitus-filter '(c2 fs8)
+                      (make-omn
+                       :length (nth eorg-high-id lengths)
+                       :pitch eorg-int-high
+                       :velocity '(p))))
+
+(setf eorg-int-low
+        (loop for i in (nth eorg-low-id voice-ids)
+              append
+                (respell
+                 (chordize
+                  (loop repeat 2
+                        for x from i by 2
+                        collect (nth x pitch-mat))))))
+
+(setf eorg-low
+      (ambitus-filter '(c2 fs8)
+                      (make-omn
+                       :length (nth eorg-low-id lengths)
+                       :pitch eorg-int-low
+                       :velocity '(p))))
+
+;;; --------------------------------------------------------
+;;; Violin
+;;; --------------------------------------------------------
+
+(setf vn-high 
+      (ambitus-filter 'violin
+                      (make-omn 
+                       :length (nth vn-high-id lengths)
+                       :pitch (nth vn-high-id pitches)
+                       :velocity '(p))))
+
+(setf vn-low 
+      (ambitus-filter 'violin
+                      (make-omn
+                       :length (nth vn-low-id lengths)
+                       :pitch (nth vn-low-id pitches)
+                       :velocity '(p))))
+
+;;; --------------------------------------------------------
+;;; Violoncello
+;;; --------------------------------------------------------
+
+(setf vc-high
+        (ambitus-filter 'cello
+                        (make-omn
+                         :length (nth vc-high-id lengths)
+                         :pitch (nth vc-high-id pitches)
+                         :velocity '(p))))
+
+(setf vc-low
+        (ambitus-filter 'cello
+                        (make-omn
+                         :length (nth vc-low-id lengths)
+                         :pitch (nth vc-low-id pitches)
+                         :velocity '(p))))
+
+;;; --------------------------------------------------------
+;;; SCORE
+;;; --------------------------------------------------------
+
+(def-score 20260922-phorminx
+    (:key-signature 'chromatic
+     :time-signature '(4 4)
+     :tempo 80
+     :flexible-clef t
+     :layout
+     (list
+      (bracket-group
+       (square-group
+        (flute-layout
+         'flute :name "Flute" :abbr "Fl.")
+        (bass-flute-layout
+         'bass-flute :name "Bass Flute" :abbr "B-Fl."))
+       (square-group
+        (clarinet-layout
+         'clarinet :name "Clarinet" :abbr "Cl.")
+        (bass-clarinet-layout
+         'bass-clarinet :name "Bass Clarinet" 
+         :abbr "B-Cl.")))
+
+      (vibraphone-layout
+       'vibraphone-high 'vibraphone-low
+       :name "Vibraphone" :abbr "Vibr.")
+
+      (square-group
+       (treble-layout
+        'e-bow :name "E-Bows" :abbr "Eb.")
+       (brace-group
+        (piano-single-layout
+         'piano-high)
+        (piano-single-layout
+         'piano-chords :name "Piano" :abbr "Pno.")
+        (bass-layout
+         'piano-low)))
+
+      (organ-layout
+       'e-organ-high 'e-organ-low
+       :name "E-Organ" :abbr "E-Org.")
+
+      (bracket-group
+       (violin-solo-layout
+        (list 'violin-high 'violin-low)
+        :name "Violin" :abbr "Vn.")
+       (violoncello-solo-layout
+        (list 'cello-high 'cello-low)
+        :name "Violoncello" :abbr "Vc."))))
+
+  ;; for programs see General MIDI.lisp
+  (flute
+   :omn fl :channel 1 :sound 'gm :program 'Flute)
+  (bass-flute
+   :omn bfl :channel 1 :sound 'gm :program 'Flute)
+
+  (clarinet
+   :omn cl :channel 2 :program 'Clarinet)
+  (bass-clarinet
+   :omn bcl :channel 2 :program 'Clarinet)
+
+  (vibraphone-high
+   :omn vibr-high :channel 3 :program 'Vibraphone)
+  (vibraphone-low
+   :omn vibr-low :channel 3 :program 'Vibraphone)
+  
+  (e-bow
+   :omn ebow :channel 4 :program 'Pad-2-Warm)
+  (piano-high
+   :omn pno-high :channel 5 :program 'Acoustic-Grand-Piano)
+  (piano-chords
+   :omn pno-chord :channel 5 :program 'Acoustic-Grand-Piano)
+  (piano-low
+   :omn pno-low :channel 5 :program 'Acoustic-Grand-Piano)
+
+  (e-organ-high
+   :omn eorg-high :channel 6 :program 'Percussive-Organ)
+  (e-organ-low
+   :omn eorg-low :channel 6 :program 'Percussive-Organ)
+ 
+  (violin-high
+   :omn vn-high :channel 7 :program 'Violin)
+  (violin-low
+   :omn vn-low :channel 7 :program 'Violin)
+
+  (cello-high
+   :omn vc-high :channel 8 :program 'Cello)
+  (cello-low
+   :omn vc-low :channel 8 :program 'Cello))
+
+;; Display the last evaluated score
+(display-musicxml '20260922-phorminx)
+
+;; Reset the init-seed
+(init-seed nil)

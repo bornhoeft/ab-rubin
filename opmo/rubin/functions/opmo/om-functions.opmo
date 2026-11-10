@@ -1,0 +1,84 @@
+(defun env-max-x (env new-max &key (round t))
+  "Stretches or compresses the x-values so that the 
+last x-value becomes NEW-MAX.
+Ex.: (env-max-x '(0 0 1 4.0 4 10.0 6 3.0) 30) 
+=> (0 0 5 4 20 10 30 3)"
+  (let* ((xs (loop for (x y) on env by #'cddr collect x))
+         (x0 (first xs))
+         (f  (/ new-max (- (car (last xs)) x0))))
+    (loop for (x y) on env by #'cddr
+          collect (let ((sx (* (- x x0) f))) 
+                    (if round (round sx) sx))
+          collect y)))
+
+(defun env-curve (env &key (exp 1))
+  "Expands an xy envelope '(x1 y1 x2 y2 …) into a list of 
+values, one value per x step, first and last point included.
+EXP: a single number for all segments, or a list, one value 
+per segment.
+Ex.: (env-curve '(0 0 2 1 4 0)) => (0 0.5 1.0 0.5 0)
+     (env-curve '(0 0 1 1 4 0))
+     => (0.0 1.0 0.6666667 0.33333334 0.0)"
+  (let ((pts (loop for (x y) on env by #'cddr 
+                   collect (list x y))))
+    (loop for (p1 p2) on pts
+          while p2
+          for i from 0
+          for e = (if (listp exp) (or (nth i exp) 1) exp)
+          for seg = (gen-transition 
+                     (second p1) (second p2)
+                     (1+ (- (first p2) (first p1))) e)
+          ;; from the 2nd segment on, drop the start 
+          ;; point (duplicate)
+          append (if (zerop i) seg (rest seg)))))
+
+#| TESTS:
+(xy-plot
+ (list
+  '(0 0 3 1 9 0)
+  (make-xy
+   (gen-integer 0 7)
+   (env-curve '(0 0 3 1 9 0))))
+ :join-points t)
+
+(env-curve '(0 0 2 1 4 0))
+
+(envelope-y (envelope-samples '(0 0 2 1 4 0) 5))
+|#
+
+(defun all-equal-p (list &key (test #'equal))
+  "True if every element of LIST is the same. Numbers and
+nested lists are both covered by the default test EQUAL.
+An empty list and a one-element list are true.
+Ex.:
+ (all-equal-p '(3 3 3))                => T
+ (all-equal-p '(3 3 4))                => NIL
+ (all-equal-p '((1 2) (1 2) (1 2)))    => T
+ (all-equal-p '((1 2) (1 3)))          => NIL
+ (all-equal-p '(1 1.0))                => NIL
+ (all-equal-p '(1 1.0) :test #'equalp) => T"
+  (or (null list)
+      (every (lambda (x) (funcall test (first list) x))
+             (rest list))))
+
+(defun merge-equal-pitches (lengths pitches)
+  "Merges runs of successive equal pitches into one event by
+summing their lengths. LENGTHS are ratios (negative = rest),
+PITCHES the parallel list, NIL for a rest.
+Returns (values lengths pitches).
+Ex.: (merge-equal-pitches '(1/4 1/4 1/2 -1/4 -1/4 1/4)
+                          '(c4 c4 e4 nil nil e4))
+     => (1/2 1/2 -1/2 1/4) / (c4 e4 nil e4)"
+  (let ((ls '()) (ps '()))
+    (loop for l in lengths
+          for p in pitches
+          do (if (and ls (eql p (first ps)))
+                 (incf (first ls) l)
+               (progn (push l ls) (push p ps))))
+    (values (nreverse ls) (nreverse ps))))
+
+(defun omn-merge-equal-pitches (seq)
+  (multiple-value-bind (ls ps)
+      (merge-equal-pitches (omn :length seq)
+                           (omn :pitch seq))
+    (make-omn :length ls :pitch ps)))

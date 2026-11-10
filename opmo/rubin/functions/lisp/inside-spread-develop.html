@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Inside spread-develop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+:root {
+  --paper: #F3F5F2;
+  --surface: #FBFCFA;
+  --code: #E6EAE5;
+  --ink: #1B2226;
+  --muted: #58626A;
+  --faint: #879197;
+  --rule: #D2D8D3;
+  --accent: #285A8C;
+  --accent-soft: #DAE5EF;
+  --mark: #92590A;
+  --mark-soft: #F2E3C9;
+  --line-soft: #93AECA;
+  --serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  --cond: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #13171A;
+    --surface: #191E22;
+    --code: #1E2529;
+    --ink: #E1E6E3;
+    --muted: #9AA5AB;
+    --faint: #6E797F;
+    --rule: #2B3338;
+    --accent: #8BB2DC;
+    --accent-soft: #1F2D3A;
+    --mark: #E0A84F;
+    --mark-soft: #3A2D18;
+    --line-soft: #4C6A8A;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #13171A;
+  --surface: #191E22;
+  --code: #1E2529;
+  --ink: #E1E6E3;
+  --muted: #9AA5AB;
+  --faint: #6E797F;
+  --rule: #2B3338;
+  --accent: #8BB2DC;
+  --accent-soft: #1F2D3A;
+  --mark: #E0A84F;
+  --mark-soft: #3A2D18;
+  --line-soft: #4C6A8A;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+  padding-inline: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, pre { font-family: var(--mono); }
+p code, li code, td code, dd code, h3 code, figcaption code {
+  font-size: 0.86em;
+  background: var(--code);
+  padding: 0.08em 0.32em;
+  border-radius: 3px;
+}
+
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  gap: 64px;
+  padding-block: 56px 96px;
+}
+main { max-width: 760px; min-width: 0; }
+main p, main li, main dd { max-width: 66ch; }
+
+nav.toc {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 40px);
+  align-self: start;
+  font-family: var(--cond);
+  font-size: 14px;
+}
+nav.toc .label { margin-bottom: 12px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+nav.toc a { display: grid; padding: 7px 10px; border-radius: 3px; text-decoration: none; color: var(--ink); }
+nav.toc a:hover { background: var(--code); }
+nav.toc a span:first-child { font-family: var(--mono); font-size: 13px; }
+nav.toc a span:last-child { color: var(--muted); font-size: 12.5px; }
+
+.label {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+header.intro { display: grid; gap: 14px; padding-bottom: 36px; border-bottom: 1px solid var(--rule); }
+header.intro h1 {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(2.1rem, 5vw, 2.7rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+header.intro .lede { font-size: 20px; line-height: 1.5; margin: 0; }
+header.intro .meta { font-size: 14.5px; color: var(--muted); margin: 0; }
+
+section { padding-block: 52px 8px; scroll-margin-top: 24px; }
+section + section { border-top: 1px solid var(--rule); }
+.sec-head { display: grid; gap: 6px; margin-bottom: 18px; }
+.sec-head h2 {
+  margin: 0;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: clamp(1.45rem, 3.4vw, 1.8rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.sec-head h2.serif { font-family: var(--serif); font-weight: 600; letter-spacing: 0; }
+.sig { font-family: var(--mono); font-size: 13.5px; color: var(--muted); overflow-x: auto; white-space: nowrap; }
+.gist { font-size: 19px; line-height: 1.5; margin: 4px 0 20px; }
+
+h3 { font-family: var(--serif); font-weight: 600; font-size: 19px; line-height: 1.3; margin: 0 0 6px; text-wrap: balance; }
+h4.example {
+  margin: 30px 0 10px;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+p { margin: 0 0 14px; }
+
+ol.steps { list-style: none; margin: 8px 0 0; padding: 0; counter-reset: step; display: grid; gap: 30px; }
+ol.steps > li { counter-increment: step; display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 14px; }
+ol.steps > li::before {
+  content: counter(step);
+  grid-column: 1;
+  grid-row: 1 / span 12;
+  align-self: start;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+}
+ol.steps > li > * { grid-column: 2; }
+ol.steps > li > *:last-child { margin-bottom: 0; }
+
+figure.code { margin: 10px 0 14px; }
+figure.code figcaption {
+  font-family: var(--cond);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin-bottom: 4px;
+}
+pre {
+  margin: 0;
+  background: var(--code);
+  color: var(--ink);
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+pre .c { color: var(--faint); }
+
+.formula {
+  margin: 12px 0 16px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--serif);
+  font-size: 21px;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.formula var { font-style: italic; }
+.formula small { display: block; font-size: 14px; color: var(--muted); white-space: normal; margin-top: 4px; }
+
+.tbl { overflow-x: auto; margin: 12px 0 8px; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+.nc { text-transform: none; }
+th {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ink);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td.l, th.l { text-align: left; }
+td.ids { text-align: left; word-spacing: 0.2em; }
+td b { font-weight: 500; color: var(--mark); background: var(--mark-soft); border-radius: 2px; padding: 0 2px; }
+td i { font-style: normal; color: var(--accent); background: var(--accent-soft); border-radius: 2px; padding: 0 2px; }
+tr.hl td { background: var(--accent-soft); }
+td.dim { color: var(--faint); }
+.tnote { font-size: 14.5px; color: var(--muted); margin: 6px 0 14px; }
+.key { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; vertical-align: -0.05em; margin-right: 0.3em; }
+.key.moved { background: var(--mark-soft); box-shadow: inset 0 0 0 1px var(--mark); }
+.key.lift { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 22px 0 26px; }
+.flow .node {
+  flex: 1 1 104px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px 12px 12px;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+}
+.flow .node b { font-family: var(--cond); font-weight: 600; font-size: 14.5px; }
+.flow .node span { font-size: 14px; line-height: 1.4; color: var(--muted); }
+.flow .node code { font-size: 12px; background: none; padding: 0; color: var(--accent); }
+.flow .node.out { background: var(--accent-soft); border-color: transparent; }
+.flow .node.out b { color: var(--accent); }
+.flow .arrow { flex: 0 0 auto; align-self: center; color: var(--faint); font-family: var(--cond); font-size: 18px; }
+
+dl.gloss { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 22px; margin: 14px 0 6px; font-size: 16px; }
+dl.gloss dt { font-family: var(--mono); font-size: 14px; color: var(--accent); padding-top: 2px; }
+dl.gloss dd { margin: 0; }
+
+/* chart */
+figure.chart { margin: 22px 0 10px; }
+.chart-box { position: relative; overflow-x: auto; }
+.chart-box svg { display: block; width: 100%; min-width: 520px; height: auto; }
+.chart-box .grid { stroke: var(--rule); stroke-width: 1; }
+.chart-box .axis { stroke: var(--muted); stroke-width: 1; }
+.chart-box text { fill: var(--muted); font-family: var(--cond); font-size: 12px; }
+.chart-box text.lab { fill: var(--ink); font-weight: 600; }
+.chart-box text.warn { fill: var(--mark); font-weight: 600; }
+.chart-box .v { fill: none; stroke: var(--line-soft); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-box .v.bass { stroke: var(--accent); }
+.chart-box .v.top { stroke: var(--ink); stroke-opacity: 0.75; }
+.chart-box .zero { fill: var(--paper); stroke: var(--accent); stroke-width: 2; }
+.chart-box .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-box .dot { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+.tip {
+  position: absolute;
+  top: 8px;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tip .th { font-family: var(--cond); font-weight: 600; font-size: 12px; color: var(--muted); letter-spacing: 0.04em; margin-bottom: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--cond); font-size: 13px; color: var(--muted); margin-top: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 18px; height: 2px; border-radius: 1px; }
+figure.chart figcaption { font-size: 14.5px; color: var(--muted); margin-top: 8px; max-width: 66ch; }
+
+.notes { display: grid; margin-top: 8px; }
+.note { padding-block: 20px; border-top: 1px solid var(--rule); }
+.note:first-child { border-top: 0; padding-top: 4px; }
+.note h3 { margin-bottom: 8px; }
+
+footer.src { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; color: var(--muted); display: grid; gap: 6px; }
+footer.src p { margin: 0; }
+
+@media (max-width: 920px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 28px; padding-block: 36px 72px; }
+  nav.toc { position: static; }
+  nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  header.intro .lede { font-size: 18px; }
+  .gist { font-size: 17.5px; }
+  .flow { flex-direction: column; }
+  .flow .arrow { transform: rotate(90deg); }
+  dl.gloss { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  dl.gloss dd { margin-bottom: 8px; }
+  ol.steps > li { grid-template-columns: 30px minmax(0, 1fr); column-gap: 10px; }
+  .formula { font-size: 18px; }
+}
+
+/* ---------- source listings ---------- */
+details.src { margin: 2px 0 24px; border: 1px solid var(--rule); border-radius: 4px; background: var(--code); }
+details.src summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+details.src summary::-webkit-details-marker { display: none; }
+details.src summary::after { content: "Hide"; color: var(--accent); }
+details.src:not([open]) summary::after { content: "Show"; }
+details.src summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+details.src pre { border-top: 1px solid var(--rule); border-radius: 0 0 4px 4px; padding: 12px 16px 14px 0; font-size: 13px; }
+pre .ln { display: inline-block; width: 3.4em; padding-right: 1.1em; text-align: right; color: var(--faint); user-select: none; -webkit-user-select: none; }
+pre .k { font-weight: 500; color: var(--ink); }
+pre .s { color: var(--mark); }
+pre .c { color: var(--faint); font-style: italic; }
+pre .kw, pre .f { color: var(--accent); }
+
+/* ---------- pitch material ---------- */
+.pm { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 5px; margin: 16px 0 6px; }
+@media (max-width: 720px) { .pm { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); } }
+.formula code { font-size: 0.74em; }
+.pm > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: 5px 6px 6px; min-width: 0; display: grid; gap: 1px; font-variant-numeric: tabular-nums; }
+.pm > div.end { background: var(--accent-soft); border-color: transparent; }
+.pm .id { font-family: var(--cond); font-weight: 600; font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
+.pm .p { font-family: var(--mono); font-size: 15px; color: var(--ink); }
+.pm .d { font-family: var(--cond); font-size: 12px; color: var(--muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Contents">
+  <div class="label">spread-develop.lisp</div>
+  <ol>
+    <li><a href="#overview"><span>overview</span><span>IDs, spread, harmonics</span></a></li>
+    <li><a href="#spread-develop-om"><span>spread-develop-om</span><span>variant A, Opusmodus</span></a></li>
+    <li><a href="#spread-develop"><span>spread-develop</span><span>variant B, plain Lisp</span></a></li>
+    <li><a href="#chain"><span>usage chain</span><span>rows to voice IDs</span></a></li>
+    <li><a href="#notes"><span>notes</span><span>things worth knowing</span></a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="intro">
+  <div class="label">Code walkthrough</div>
+  <h1>Inside spread-develop</h1>
+  <p class="lede">A development in which the IDs are spread: nine voices open out from a unison, widen, and draw together again above a moving transposition. Every step of the original <code>spread-develop-om</code>, the new plain Common Lisp <code>spread-develop</code>, and the chain that turns the rows into voice IDs — positions in a pitch material of 33 piano notes taken from the harmonic series on G-1.</p>
+  <p class="meta">Traced in SBCL 2.2.9 with 11 events. The Opusmodus functions (<code>gen-integer</code>, <code>envelope-samples</code>, <code>envelope-y</code>, <code>rnd-number</code>, <code>integer-transpose</code>, <code>matrix-transpose</code>) were replaced by stand-ins that behave as the docstring describes. A check at the end of <code>spread-develop.lisp</code> confirms this in Opusmodus.</p>
+</header>
+
+<!-- ======================================================= -->
+<section id="overview">
+  <div class="sec-head">
+    <div class="label">Overview</div>
+    <h2 class="serif">IDs, spread and transposition</h2>
+  </div>
+  <p>Two envelopes run over the same events. The <strong>transposition envelope</strong> sets the lowest ID of each chord. The <strong>spread envelope</strong> sets how far apart neighbouring voices are. Voice <var>k</var> of an event therefore gets:</p>
+  <div class="formula">ID = <var>t</var> + round(<var>k</var> · <var>f</var>)
+    <small><var>k</var> = 0 … 8, the voice counted from the bottom · <var>t</var> = transposition · <var>f</var> = spread factor at this event</small></div>
+
+  <div class="flow" role="list">
+    <div class="node" role="listitem"><b>Spread envelope</b><span>factor <var>f</var> per event</span></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><b>Rows</b><span>0, <var>f</var>, 2<var>f</var> … 8<var>f</var>, rounded</span></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><b>+ transposition</b><span><var>t</var> added to every ID of the row</span></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><b>Turn and reverse</b><span>rows become voices, top voice first</span></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node out" role="listitem"><b>voice-ids</b><span>9 lists, one ID per event</span></div>
+  </div>
+
+<figure class="chart"><div class="chart-box" id="idchart" data-voices="[[2, 5, 8, 12, 17, 26, 30, 32, 25, 18, 11], [2, 4, 8, 11, 15, 24, 27, 28, 22, 16, 10], [2, 4, 7, 10, 13, 21, 24, 24, 19, 14, 9], [2, 4, 6, 9, 12, 18, 20, 20, 16, 12, 8], [2, 3, 6, 8, 10, 16, 17, 16, 13, 10, 7], [2, 3, 5, 7, 8, 14, 14, 12, 10, 8, 6], [2, 3, 4, 6, 7, 11, 10, 8, 7, 6, 5], [2, 2, 4, 5, 5, 8, 7, 4, 4, 4, 4], [2, 2, 3, 4, 3, 6, 4, 0, 1, 2, 3]]" data-l="44" data-r="656" data-t="30" data-b="262" data-ymax="32" data-w="720"><svg viewBox="0 0 720 300" role="img" aria-label="Voice IDs of nine voices over eleven events"><line class="grid" x1="44" x2="656" y1="262.0" y2="262.0"></line><text x="36" y="266.0" text-anchor="end">0</text><line class="grid" x1="44" x2="656" y1="204.0" y2="204.0"></line><text x="36" y="208.0" text-anchor="end">8</text><line class="grid" x1="44" x2="656" y1="146.0" y2="146.0"></line><text x="36" y="150.0" text-anchor="end">16</text><line class="grid" x1="44" x2="656" y1="88.0" y2="88.0"></line><text x="36" y="92.0" text-anchor="end">24</text><line class="grid" x1="44" x2="656" y1="30.0" y2="30.0"></line><text x="36" y="34.0" text-anchor="end">32</text><line class="axis" x1="44" x2="656" y1="262" y2="262"></line><text x="44.0" y="280" text-anchor="middle">0</text><text x="105.2" y="280" text-anchor="middle">1</text><text x="166.4" y="280" text-anchor="middle">2</text><text x="227.6" y="280" text-anchor="middle">3</text><text x="288.8" y="280" text-anchor="middle">4</text><text x="350.0" y="280" text-anchor="middle">5</text><text x="411.2" y="280" text-anchor="middle">6</text><text x="472.4" y="280" text-anchor="middle">7</text><text x="533.6" y="280" text-anchor="middle">8</text><text x="594.8" y="280" text-anchor="middle">9</text><text x="656.0" y="280" text-anchor="middle">10</text><text x="36" y="296" text-anchor="end">event</text><text x="36" y="12" text-anchor="end">ID</text><polyline class="v" points="44.0,247.5 105.2,233.0 166.4,204.0 227.6,182.2 288.8,153.2 350.0,88.0 411.2,66.2 472.4,59.0 533.6,102.5 594.8,146.0 656.0,189.5"></polyline><polyline class="v" points="44.0,247.5 105.2,233.0 166.4,211.2 227.6,189.5 288.8,167.8 350.0,109.8 411.2,88.0 472.4,88.0 533.6,124.2 594.8,160.5 656.0,196.8"></polyline><polyline class="v" points="44.0,247.5 105.2,233.0 166.4,218.5 227.6,196.8 288.8,175.0 350.0,131.5 411.2,117.0 472.4,117.0 533.6,146.0 594.8,175.0 656.0,204.0"></polyline><polyline class="v" points="44.0,247.5 105.2,240.2 166.4,218.5 227.6,204.0 288.8,189.5 350.0,146.0 411.2,138.8 472.4,146.0 533.6,167.8 594.8,189.5 656.0,211.2"></polyline><polyline class="v" points="44.0,247.5 105.2,240.2 166.4,225.8 227.6,211.2 288.8,204.0 350.0,160.5 411.2,160.5 472.4,175.0 533.6,189.5 594.8,204.0 656.0,218.5"></polyline><polyline class="v" points="44.0,247.5 105.2,240.2 166.4,233.0 227.6,218.5 288.8,211.2 350.0,182.2 411.2,189.5 472.4,204.0 533.6,211.2 594.8,218.5 656.0,225.8"></polyline><polyline class="v" points="44.0,247.5 105.2,247.5 166.4,233.0 227.6,225.8 288.8,225.8 350.0,204.0 411.2,211.2 472.4,233.0 533.6,233.0 594.8,233.0 656.0,233.0"></polyline><polyline class="v top" points="44.0,247.5 105.2,225.8 166.4,204.0 227.6,175.0 288.8,138.8 350.0,73.5 411.2,44.5 472.4,30.0 533.6,80.8 594.8,131.5 656.0,182.2"></polyline><polyline class="v bass" points="44.0,247.5 105.2,247.5 166.4,240.2 227.6,233.0 288.8,240.2 350.0,218.5 411.2,233.0 472.4,262.0 533.6,254.8 594.8,247.5 656.0,240.2"></polyline><text class="lab" x="664" y="186.2">voice 9</text><text class="lab" x="664" y="244.2">voice 1</text><circle class="zero" cx="472.4" cy="262.0" r="5"></circle><text class="lab" x="481.4" y="248.0">ID 0 = g1</text><circle class="zero" cx="472.4" cy="30.0" r="5"></circle><text class="lab" x="472.4" y="20.0" text-anchor="middle">ID 32 = cs7</text><line class="cross" x1="0" x2="0" y1="30" y2="262"></line><g class="dots"></g></svg><div class="tip" hidden></div></div><div class="legend"><span><i style="background:var(--ink);opacity:.75"></i>voice 9, top</span><span><i style="background:var(--line-soft)"></i>voices 2–8</span><span><i style="background:var(--accent)"></i>voice 1, bottom = transposition</span></div><figcaption>The nine voices of the example: <code>voice-ids</code> as <code>list-plot</code> draws them. The bottom line is the transposition envelope; the fan above it is the spread, closed at event 0 and widest at event 7, where the transposition reaches 0: the lowest voice lands on ID 0 (g1) and the top voice on ID 32 (cs7), the two ends of the pitch material. Hover for the IDs of an event; all values are in the voice-ids table below.</figcaption></figure>
+
+  <h3>From ID to pitch and partial</h3>
+  <p>The IDs are positions in the pitch material of the piece: the 33 piano pitches that lie within 6 cents of the chromatic scale among partials 4 to 181 of the harmonic series on G-1 (12.249859 Hz). Without transposition, ID 0 is the lowest of them, g1 (partial 4); ID 2 is g2 (partial 8); ID 32 is the highest, cs7 (partial 181).</p>
+  <div class="formula">pitch = <code>(nth ID pitch-mat)</code> &nbsp;·&nbsp; partial = <code>(nth ID multiplicators)</code>
+    <small>the Pd sequencer plays partial × 12.249859 Hz: ID 2 → partial 8 → 98.00 Hz</small></div>
+  <div class="pm" aria-label="Pitch material, 33 pitches"><div class="end"><span class="id">ID 0</span><span class="p">g1</span><span class="d">4</span><span class="d">±0¢</span></div><div><span class="id">ID 1</span><span class="p">d2</span><span class="d">6</span><span class="d">+2¢</span></div><div><span class="id">ID 2</span><span class="p">g2</span><span class="d">8</span><span class="d">±0¢</span></div><div><span class="id">ID 3</span><span class="p">a2</span><span class="d">9</span><span class="d">+4¢</span></div><div><span class="id">ID 4</span><span class="p">d3</span><span class="d">12</span><span class="d">+2¢</span></div><div><span class="id">ID 5</span><span class="p">g3</span><span class="d">16</span><span class="d">±0¢</span></div><div><span class="id">ID 6</span><span class="p">gs3</span><span class="d">17</span><span class="d">+5¢</span></div><div><span class="id">ID 7</span><span class="p">a3</span><span class="d">18</span><span class="d">+4¢</span></div><div><span class="id">ID 8</span><span class="p">bb3</span><span class="d">19</span><span class="d">−2¢</span></div><div><span class="id">ID 9</span><span class="p">d4</span><span class="d">24</span><span class="d">+2¢</span></div><div><span class="id">ID 10</span><span class="p">e4</span><span class="d">27</span><span class="d">+6¢</span></div><div><span class="id">ID 11</span><span class="p">g4</span><span class="d">32</span><span class="d">±0¢</span></div><div><span class="id">ID 12</span><span class="p">gs4</span><span class="d">34</span><span class="d">+5¢</span></div><div><span class="id">ID 13</span><span class="p">a4</span><span class="d">36</span><span class="d">+4¢</span></div><div><span class="id">ID 14</span><span class="p">bb4</span><span class="d">38</span><span class="d">−2¢</span></div><div><span class="id">ID 15</span><span class="p">d5</span><span class="d">48</span><span class="d">+2¢</span></div><div><span class="id">ID 16</span><span class="p">e5</span><span class="d">54</span><span class="d">+6¢</span></div><div><span class="id">ID 17</span><span class="p">f5</span><span class="d">57</span><span class="d">−1¢</span></div><div><span class="id">ID 18</span><span class="p">g5</span><span class="d">64</span><span class="d">±0¢</span></div><div><span class="id">ID 19</span><span class="p">gs5</span><span class="d">68</span><span class="d">+5¢</span></div><div><span class="id">ID 20</span><span class="p">a5</span><span class="d">72</span><span class="d">+4¢</span></div><div><span class="id">ID 21</span><span class="p">bb5</span><span class="d">76</span><span class="d">−2¢</span></div><div><span class="id">ID 22</span><span class="p">d6</span><span class="d">96</span><span class="d">+2¢</span></div><div><span class="id">ID 23</span><span class="p">e6</span><span class="d">108</span><span class="d">+6¢</span></div><div><span class="id">ID 24</span><span class="p">f6</span><span class="d">114</span><span class="d">−1¢</span></div><div><span class="id">ID 25</span><span class="p">fs6</span><span class="d">121</span><span class="d">+3¢</span></div><div><span class="id">ID 26</span><span class="p">g6</span><span class="d">128</span><span class="d">±0¢</span></div><div><span class="id">ID 27</span><span class="p">gs6</span><span class="d">136</span><span class="d">+5¢</span></div><div><span class="id">ID 28</span><span class="p">a6</span><span class="d">144</span><span class="d">+4¢</span></div><div><span class="id">ID 29</span><span class="p">bb6</span><span class="d">152</span><span class="d">−2¢</span></div><div><span class="id">ID 30</span><span class="p">b6</span><span class="d">161</span><span class="d">−3¢</span></div><div><span class="id">ID 31</span><span class="p">c7</span><span class="d">171</span><span class="d">+1¢</span></div><div class="end"><span class="id">ID 32</span><span class="p">cs7</span><span class="d">181</span><span class="d">±0¢</span></div></div>
+  <p class="tnote">Each tile: ID, piano pitch, partial, deviation from the chromatic scale in cents.</p>
+  <p>The selection keeps only partials that fit the piano, so it is sparse at the bottom and dense at the top: IDs 0–2 span an octave (g1 d2 g2), IDs 28–32 only a major third (a6 … cs7). A spread of <var>f</var> therefore means every <var>f</var>-th pitch of the material, as the usage comment says — not a fixed interval and not a fixed number of partials.</p>
+
+  <dl class="gloss">
+    <dt>len</dt><dd>number of voices (9 in the score)</dd>
+    <dt>env</dt><dd>spread envelope <code>'(x1 y1 x2 y2 …)</code>, y = spread factor</dd>
+    <dt>n</dt><dd>number of rows = events</dd>
+    <dt>f</dt><dd>spread factor of one row, sampled from the envelope</dd>
+    <dt>v, r, d</dt><dd>variance, random number (−1 … 1), jitter factor 1 + v · r</dd>
+    <dt>t</dt><dd>transposition of one event, from the transposition envelope</dd>
+    <dt>ID</dt><dd>position in the pitch material, 0 … 32: ID 0 = g1 (partial 4), ID 2 = g2 (partial 8)</dd>
+    <dt>multiplicator</dt><dd>the partial number belonging to an ID, for the Pd sequencer (fundamental 12.249859 Hz)</dd>
+  </dl>
+</section>
+
+<!-- ======================================================= -->
+<section id="spread-develop-om">
+  <div class="sec-head">
+    <div class="label">Variant A · original, with Opusmodus functions</div>
+    <h2>spread-develop-om</h2>
+    <div class="sig">(spread-develop-om len env &amp;key variance steps round seed) → rows</div>
+  </div>
+
+  <details class="src" open>
+    <summary><span>Source · spread-develop.lisp, lines 19–51</span></summary>
+    <pre><span class="ln">19</span><span class="c">;;; --------------------------------------------------------</span>
+<span class="ln">20</span><span class="c">;;; Variant A -- with Opusmodus functions</span>
+<span class="ln">21</span><span class="c">;;; --------------------------------------------------------</span>
+<span class="ln">22</span>
+<span class="ln">23</span>(<span class="k">defun</span> spread-develop-om (len env &amp;key (variance 0.0)
+<span class="ln">24</span>                                       steps round seed)
+<span class="ln">25</span>  <span class="s">"Development in which LEN IDs are spread: row by row, the</span>
+<span class="ln">26</span><span class="s">IDs 0 ... LEN-1 are multiplied by a spread factor that</span>
+<span class="ln">27</span><span class="s">follows an xy envelope.</span>
+<span class="ln">28</span><span class="s">ENV '(x1 y1 x2 y2 ...): x = step index, y = spread factor.</span>
+<span class="ln">29</span><span class="s">By default one row per integer x step; STEPS overrides that</span>
+<span class="ln">30</span><span class="s">count, and the x values then act as mere proportions.</span>
+<span class="ln">31</span><span class="s">VARIANCE: a number, or its own xy envelope -- it is</span>
+<span class="ln">32</span><span class="s">resampled to the same count, so its x range does not matter.</span>
+<span class="ln">33</span><span class="s">Ex.:</span>
+<span class="ln">34</span><span class="s"> (spread-develop-om 5 '(0 0 5 2 12 3 15 1 20 0) :round t)</span>
+<span class="ln">35</span><span class="s"> (spread-develop-om 5 '(0 0 1 2 2.4 3 3 1 4 0) :steps 40)"</span>
+<span class="ln">36</span>  (<span class="k">let*</span> ((base  (gen-integer 0 (1- len)))
+<span class="ln">37</span>         (n     (<span class="k">or</span> steps (1+ (- (car (last env 2))
+<span class="ln">38</span>                                 (first env)))))
+<span class="ln">39</span>         (curve (envelope-y (envelope-samples env n)))
+<span class="ln">40</span>         (vars  (<span class="k">if</span> (listp variance)
+<span class="ln">41</span>                    (envelope-y
+<span class="ln">42</span>                     (envelope-samples variance n))
+<span class="ln">43</span>                    (make-list n
+<span class="ln">44</span>                               <span class="kw">:initial-element</span> variance)))
+<span class="ln">45</span>         (noise (rnd-number n -1.0 1.0 <span class="kw">:seed</span> seed)))
+<span class="ln">46</span>    (<span class="k">loop</span> <span class="k">for</span> f <span class="k">in</span> curve
+<span class="ln">47</span>          <span class="k">for</span> v <span class="k">in</span> vars
+<span class="ln">48</span>          <span class="k">for</span> r <span class="k">in</span> noise
+<span class="ln">49</span>          <span class="k">for</span> d = (+ 1.0 (* v r))
+<span class="ln">50</span>          <span class="k">for</span> row = (mapcar (<span class="k">lambda</span> (y) (* y f d)) base)
+<span class="ln">51</span>          <span class="k">collect</span> (<span class="k">if</span> round (mapcar <span class="f">#'round</span> row) row))))</pre>
+  </details>
+  <p class="gist">Builds one row per event: the voice numbers 0 … len−1, multiplied by the spread factor the envelope has at that event, optionally jittered and rounded.</p>
+
+  <h4 class="example">Worked example</h4>
+  <pre>(spread-develop-om 9 '(0 0 30 1 70 4 100 1)
+                   :steps 11 :round t)</pre>
+
+  <ol class="steps" style="margin-top:26px">
+    <li>
+      <h3>The voice numbers</h3>
+      <p><code>gen-integer</code> counts from 0 to len − 1: <strong>(0 1 2 3 4 5 6 7 8)</strong>. Each number is a voice’s distance from the bottom voice, measured in spread units. They are the same for every row; only the factor changes.</p>
+      <figure class="code"><figcaption>BASE</figcaption><pre>(base (gen-integer 0 (1- len)))</pre></figure>
+    </li>
+    <li>
+      <h3>How many rows</h3>
+      <p>With <code>:steps</code>, that number: 11. Without it, last x − first x + 1, one row per whole x step. <code>(car (last env 2))</code> takes the last two elements of the envelope and returns the first of them, the last x. For this envelope that would be 101 rows.</p>
+      <p>With <code>:steps</code> the x values only act as proportions: the same shape, compressed onto 11 events.</p>
+      <figure class="code"><figcaption>N</figcaption><pre>(n (or steps (1+ (- (car (last env 2))
+                    (first env)))))</pre></figure>
+    </li>
+    <li>
+      <h3>Sample the spread envelope</h3>
+      <p><code>envelope-samples</code> places <var>n</var> points evenly from the first to the last x; <code>envelope-y</code> keeps only their y values. With 11 rows the points fall on x = 0, 10, 20 … 100. Between two envelope points the value lies on a straight line: at x = 50, halfway from (30, 1) to (70, 4), <var>f</var> = 1 + 3 · 20/40 = 2.5.</p>
+      <figure class="code"><figcaption>CURVE</figcaption><pre>(curve (envelope-y (envelope-samples env n)))</pre></figure>
+<div class="tbl"><table><tbody><tr><td class="l"><span class="label">x</span></td><td>0</td><td>10</td><td>20</td><td>30</td><td>40</td><td>50</td><td>60</td><td>70</td><td>80</td><td>90</td><td>100</td></tr><tr><td class="l"><span class="label"><span class="nc">f</span></span></td><td>0</td><td>1/3</td><td>2/3</td><td>1</td><td>1.75</td><td>2.5</td><td>3.25</td><td>4</td><td>3</td><td>2</td><td>1</td></tr></tbody></table></div>
+    </li>
+    <li>
+      <h3>Variance for every row</h3>
+      <p>A single number is repeated <var>n</var> times. An envelope is resampled to <var>n</var> values just like the spread, so its own x range does not matter: <code>'(0 0 1 0.5)</code> and <code>'(0 0 100 0.5)</code> give the same variance curve.</p>
+      <figure class="code"><figcaption>VARS</figcaption><pre>(vars (if (listp variance)
+          (envelope-y
+           (envelope-samples variance n))
+          (make-list n
+                     :initial-element variance)))</pre></figure>
+    </li>
+    <li>
+      <h3>One random number per row</h3>
+      <p><code>rnd-number</code> gives <var>n</var> numbers between −1.0 and 1.0. With <code>:seed</code> they are the same on every run.</p>
+      <figure class="code"><figcaption>NOISE</figcaption><pre>(noise (rnd-number n -1.0 1.0 :seed seed))</pre></figure>
+    </li>
+    <li>
+      <h3>The jitter factor</h3>
+      <div class="formula"><var>d</var> = 1 + <var>v</var> · <var>r</var>
+        <small>with v = 0.25, d lies between 0.75 and 1.25 · with variance 0 (the default) d is always 1</small></div>
+      <p><var>d</var> multiplies the spread of the whole row. The chord breathes wider or narrower, but all its voices move together, so they never cross.</p>
+<div class="tbl"><table><thead><tr><th>event</th><th><span class="nc">f</span></th><th><span class="nc">r</span></th><th><span class="nc">d</span></th><th><span class="nc">f · d</span></th><th class=l>row, rounded</th></tr></thead><tbody><tr><td>3</td><td>1</td><td>-0.735</td><td>0.816</td><td>0.816</td><td class="ids">0 1 2 2 3 4 5 6 7</td></tr><tr><td>4</td><td>1.75</td><td>+0.596</td><td>1.149</td><td>2.011</td><td class="ids">0 2 4 6 8 10 12 14 16</td></tr><tr><td>5</td><td>2.5</td><td>-0.739</td><td>0.815</td><td>2.038</td><td class="ids">0 2 4 6 8 10 12 14 16</td></tr><tr><td>6</td><td>3.25</td><td>-0.966</td><td>0.759</td><td>2.465</td><td class="ids">0 2 5 7 10 12 15 17 20</td></tr><tr><td>7</td><td>4</td><td>+0.350</td><td>1.087</td><td>4.350</td><td class="ids">0 4 9 13 17 22 26 30 35</td></tr></tbody></table></div><p class="tnote">Variance 0.25, seed 7. The random numbers here come from the plain version; <code>rnd-number</code> gives different ones for the same seed. Rows 4 and 5 end up identical although their spread factors differ.</p>
+    </li>
+    <li>
+      <h3>Build the row</h3>
+      <p>Each voice number is multiplied by <var>f</var> and <var>d</var>: row = (0, <var>f</var>·<var>d</var>, 2·<var>f</var>·<var>d</var> … 8·<var>f</var>·<var>d</var>). The bottom voice is always 0; it will carry the transposition later.</p>
+      <figure class="code"><figcaption>LOOP</figcaption><pre>(loop for f in curve
+      for v in vars
+      for r in noise
+      for d = (+ 1.0 (* v r))
+      for row = (mapcar (lambda (y) (* y f d)) base)
+      collect (if round (mapcar #'round row) row))</pre></figure>
+    </li>
+    <li>
+      <h3>Round to IDs</h3>
+      <p>With <code>:round t</code> every value becomes the nearest whole number. Common Lisp’s <code>round</code> sends exact halves to the <em>even</em> neighbour: 2.5 → 2, 7.5 → 8 (see <a href="#notes">notes</a>).</p>
+    </li>
+  </ol>
+
+  <h4 class="example">The whole trace, variance 0</h4>
+<div class="tbl"><table><thead><tr><th>event</th><th>x</th><th><span class="nc">f</span></th><th class=l>IDs, voice 1 → 9</th></tr></thead><tbody><tr><td>0</td><td>0</td><td>0</td><td class="ids"><i>0</i> <i>0</i> <i>0</i> <i>0</i> <i>0</i> <i>0</i> <i>0</i> <i>0</i> <i>0</i></td></tr><tr><td>1</td><td>10</td><td>1/3</td><td class="ids"><i>0</i> <i>0</i> <i>1</i> <i>1</i> <i>1</i> <i>2</i> <i>2</i> <i>2</i> 3</td></tr><tr><td>2</td><td>20</td><td>2/3</td><td class="ids">0 <i>1</i> <i>1</i> 2 <i>3</i> <i>3</i> 4 <i>5</i> <i>5</i></td></tr><tr><td>3</td><td>30</td><td>1</td><td class="ids">0 1 2 3 4 5 6 7 8</td></tr><tr><td>4</td><td>40</td><td>1.75</td><td class="ids">0 2 <b>4</b> 5 7 9 <b>10</b> 12 14</td></tr><tr><td>5</td><td>50</td><td>2.5</td><td class="ids">0 <b>2</b> 5 <b>8</b> 10 <b>12</b> 15 <b>18</b> 20</td></tr><tr><td>6</td><td>60</td><td>3.25</td><td class="ids">0 3 <b>6</b> 10 13 16 <b>20</b> 23 26</td></tr><tr><td>7</td><td>70</td><td>4</td><td class="ids">0 4 8 12 16 20 24 28 32</td></tr><tr><td>8</td><td>80</td><td>3</td><td class="ids">0 3 6 9 12 15 18 21 24</td></tr><tr><td>9</td><td>90</td><td>2</td><td class="ids">0 2 4 6 8 10 12 14 16</td></tr><tr><td>10</td><td>100</td><td>1</td><td class="ids">0 1 2 3 4 5 6 7 8</td></tr></tbody></table></div>
+  <p class="tnote"><span class="key lift"></span>repeated ID (voices doubling each other) &nbsp; <span class="key moved"></span>exact half, rounded to even. Rows 1 and 2 (<var>f</var> below 1) contain doublings; from row 3 on (<var>f</var> = 1) all nine IDs are distinct.</p>
+</section>
+
+<!-- ======================================================= -->
+<section id="spread-develop">
+  <div class="sec-head">
+    <div class="label">Variant B · plain Common Lisp · new</div>
+    <h2>spread-develop</h2>
+    <div class="sig">(spread-develop len env &amp;key variance steps round seed) → rows</div>
+  </div>
+
+  <details class="src" open>
+    <summary><span>Source · spread-develop.lisp, lines 53–145</span></summary>
+    <pre><span class="ln">53</span><span class="c">;;; --------------------------------------------------------</span>
+<span class="ln">54</span><span class="c">;;; Variant B -- plain Common Lisp</span>
+<span class="ln">55</span><span class="c">;;;</span>
+<span class="ln">56</span><span class="c">;;; Same interface and computation. Two parts had to be</span>
+<span class="ln">57</span><span class="c">;;; rebuilt:</span>
+<span class="ln">58</span><span class="c">;;; - envelope resampling: N evenly spaced points from the</span>
+<span class="ln">59</span><span class="c">;;;   first to the last x, both ends included, linearly</span>
+<span class="ln">60</span><span class="c">;;;   interpolated (the behaviour the docstring of the</span>
+<span class="ln">61</span><span class="c">;;;   Opusmodus version relies on);</span>
+<span class="ln">62</span><span class="c">;;; - noise: a seeded 32-bit hash of SEED and the row</span>
+<span class="ln">63</span><span class="c">;;;   number, so a given SEED repeats in every Lisp. It is</span>
+<span class="ln">64</span><span class="c">;;;   NOT the sequence RND-NUMBER gives for the same SEED.</span>
+<span class="ln">65</span><span class="c">;;; With VARIANCE 0 both variants should return the same</span>
+<span class="ln">66</span><span class="c">;;; rows -- see the check at the end of the file.</span>
+<span class="ln">67</span><span class="c">;;; --------------------------------------------------------</span>
+<span class="ln">68</span>
+<span class="ln">69</span>(<span class="k">defun</span> env-y-at (env x)
+<span class="ln">70</span>  <span class="s">"Y value of the xy envelope ENV '(x1 y1 x2 y2 ...) at X,</span>
+<span class="ln">71</span><span class="s">linearly interpolated. Beyond either end the end value</span>
+<span class="ln">72</span><span class="s">holds. Two points with the same x make a vertical jump."</span>
+<span class="ln">73</span>  (<span class="k">if</span> (&lt;= x (first env))
+<span class="ln">74</span>      (second env)
+<span class="ln">75</span>      (<span class="k">loop</span> <span class="k">for</span> (xa ya xb yb) <span class="k">on</span> env <span class="k">by</span> <span class="f">#'cddr</span>
+<span class="ln">76</span>            <span class="k">while</span> xb
+<span class="ln">77</span>            <span class="k">when</span> (&lt;= x xb)
+<span class="ln">78</span>              <span class="k">do</span> (<span class="k">return</span>
+<span class="ln">79</span>                   (<span class="k">if</span> (= xa xb)
+<span class="ln">80</span>                       yb
+<span class="ln">81</span>                       (+ ya (/ (* (- yb ya) (- x xa))
+<span class="ln">82</span>                                (- xb xa)))))
+<span class="ln">83</span>            <span class="k">finally</span> (<span class="k">return</span> (car (last env))))))
+<span class="ln">84</span>
+<span class="ln">85</span>(<span class="k">defun</span> env-samples-y (env n)
+<span class="ln">86</span>  <span class="s">"N evenly spaced y values of the xy envelope ENV, from</span>
+<span class="ln">87</span><span class="s">its first to its last x, both ends included."</span>
+<span class="ln">88</span>  (<span class="k">let</span> ((x0 (first env))
+<span class="ln">89</span>        (x1 (car (last env 2))))
+<span class="ln">90</span>    (<span class="k">loop</span> <span class="k">for</span> i <span class="k">below</span> n
+<span class="ln">91</span>          <span class="k">collect</span> (env-y-at
+<span class="ln">92</span>                   env
+<span class="ln">93</span>                   (<span class="k">if</span> (= n 1)
+<span class="ln">94</span>                       x0
+<span class="ln">95</span>                       (+ x0 (/ (* i (- x1 x0))
+<span class="ln">96</span>                                (1- n))))))))
+<span class="ln">97</span>
+<span class="ln">98</span>(<span class="k">defun</span> noise-at (seed i)
+<span class="ln">99</span>  <span class="s">"Number from -1.0 to 1.0 for row I, fully determined by</span>
+<span class="ln">100</span><span class="s">the integer SEED. A 32-bit integer hash (murmur3</span>
+<span class="ln">101</span><span class="s">finalizer): neighbouring rows and seeds give unrelated</span>
+<span class="ln">102</span><span class="s">values."</span>
+<span class="ln">103</span>  (<span class="k">flet</span> ((u32 (x) (logand x #xFFFFFFFF)))
+<span class="ln">104</span>    (<span class="k">let</span> ((h (u32 (+ (* seed #x9E3779B9) i))))
+<span class="ln">105</span>      (<span class="k">setf</span> h (u32 (* (logxor h (ash h -16))
+<span class="ln">106</span>                      #x85EBCA6B))
+<span class="ln">107</span>            h (u32 (* (logxor h (ash h -13))
+<span class="ln">108</span>                      #xC2B2AE35))
+<span class="ln">109</span>            h (logxor h (ash h -16)))
+<span class="ln">110</span>      (- (* 2.0 (/ h #xFFFFFFFF)) 1.0))))
+<span class="ln">111</span>
+<span class="ln">112</span>(<span class="k">defun</span> spread-develop (len env &amp;key (variance 0.0)
+<span class="ln">113</span>                                    steps round seed)
+<span class="ln">114</span>  <span class="s">"Plain Common Lisp version of SPREAD-DEVELOP-OM.</span>
+<span class="ln">115</span><span class="s">Development in which LEN IDs are spread: row by row, the</span>
+<span class="ln">116</span><span class="s">IDs 0 ... LEN-1 are multiplied by a spread factor that</span>
+<span class="ln">117</span><span class="s">follows an xy envelope.</span>
+<span class="ln">118</span><span class="s">ENV '(x1 y1 x2 y2 ...): x = step index, y = spread factor.</span>
+<span class="ln">119</span><span class="s">By default one row per integer x step; STEPS overrides that</span>
+<span class="ln">120</span><span class="s">count, and the x values then act as mere proportions.</span>
+<span class="ln">121</span><span class="s">VARIANCE: a number, or its own xy envelope -- resampled to</span>
+<span class="ln">122</span><span class="s">the same count, so its x range does not matter.</span>
+<span class="ln">123</span><span class="s">SEED: an integer for repeatable noise (a different</span>
+<span class="ln">124</span><span class="s">sequence from Opusmodus RND-NUMBER).</span>
+<span class="ln">125</span><span class="s">Ex.:</span>
+<span class="ln">126</span><span class="s"> (spread-develop 5 '(0 0 5 2 12 3 15 1 20 0) :round t)</span>
+<span class="ln">127</span><span class="s"> (spread-develop 5 '(0 0 1 2 2.4 3 3 1 4 0) :steps 40)"</span>
+<span class="ln">128</span>  (<span class="k">let*</span> ((n     (<span class="k">or</span> steps
+<span class="ln">129</span>                    (1+ (floor (- (car (last env 2))
+<span class="ln">130</span>                                  (first env))))))
+<span class="ln">131</span>         (curve (env-samples-y env n))
+<span class="ln">132</span>         (vars  (<span class="k">if</span> (consp variance)
+<span class="ln">133</span>                    (env-samples-y variance n)
+<span class="ln">134</span>                    (make-list n
+<span class="ln">135</span>                               <span class="kw">:initial-element</span> variance))))
+<span class="ln">136</span>    (<span class="k">loop</span> <span class="k">for</span> i <span class="k">below</span> n
+<span class="ln">137</span>          <span class="k">for</span> f <span class="k">in</span> curve
+<span class="ln">138</span>          <span class="k">for</span> v <span class="k">in</span> vars
+<span class="ln">139</span>          <span class="k">for</span> r = (<span class="k">if</span> seed
+<span class="ln">140</span>                      (noise-at seed i)
+<span class="ln">141</span>                      (- (random 2.0) 1.0))
+<span class="ln">142</span>          <span class="k">for</span> d = (+ 1.0 (* v r))
+<span class="ln">143</span>          <span class="k">collect</span> (<span class="k">loop</span> <span class="k">for</span> y <span class="k">below</span> len
+<span class="ln">144</span>                        <span class="k">for</span> x = (* y f d)
+<span class="ln">145</span>                        <span class="k">collect</span> (<span class="k">if</span> round (round x) x)))))</pre>
+  </details>
+  <p class="gist">The same computation without Opusmodus. Three small helpers replace the library functions; the interface is unchanged, so it drops into the chain in place of spread-develop-om.</p>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th class="l">Opusmodus</th><th class="l">plain Common Lisp</th></tr></thead>
+      <tbody>
+        <tr><td class="l">(gen-integer 0 (1- len))</td><td class="l">(loop for y below len …)</td></tr>
+        <tr><td class="l">(envelope-y (envelope-samples env n))</td><td class="l">(env-samples-y env n), using env-y-at</td></tr>
+        <tr><td class="l">(rnd-number n -1.0 1.0 :seed seed)</td><td class="l">(noise-at seed i), or random without a seed</td></tr>
+        <tr><td class="l">(integer-transpose t row)</td><td class="l">(mapcar (lambda (id) (+ id t)) row)</td></tr>
+        <tr><td class="l">(matrix-transpose rows)</td><td class="l">(apply #'mapcar #'list rows)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ol class="steps" style="margin-top:26px">
+    <li>
+      <h3>env-y-at: one value of an envelope</h3>
+      <p><code>(loop for (xa ya xb yb) on env by #'cddr …)</code> walks along the envelope two numbers at a time and looks at one pair of neighbouring points per round. The first segment whose right end <var>xb</var> reaches <var>x</var> is the one that counts, and the value is read off the straight line between its points.</p>
+      <div class="formula"><var>y</var> = <var>ya</var> + (<var>yb</var> − <var>ya</var>) · (<var>x</var> − <var>xa</var>) ÷ (<var>xb</var> − <var>xa</var>)
+        <small>x = 50 between (30, 1) and (70, 4): 1 + 3 · 20 ÷ 40 = 5/2</small></div>
+      <p>Before the first x the first y holds, after the last x the last y. Two points with the same x (a vertical jump) return the right-hand y.</p>
+      <figure class="code"><figcaption>ENV-Y-AT</figcaption><pre>(if (&lt;= x (first env))
+    (second env)
+    (loop for (xa ya xb yb) on env by #'cddr
+          while xb
+          when (&lt;= x xb)
+            do (return
+                 (if (= xa xb)
+                     yb
+                     (+ ya (/ (* (- yb ya) (- x xa))
+                              (- xb xa)))))
+          finally (return (car (last env)))))</pre></figure>
+    </li>
+    <li>
+      <h3>env-samples-y: n evenly spaced values</h3>
+      <div class="formula"><var>x<sub>i</sub></var> = <var>x</var><sub>first</sub> + <var>i</var> · (<var>x</var><sub>last</sub> − <var>x</var><sub>first</sub>) ÷ (<var>n</var> − 1)
+        <small>i = 0 … n − 1: the first sample sits on the first x, the last on the last x</small></div>
+      <p>With <var>n</var> = 1 there is no spacing to compute; the single sample sits on the first x. With whole-number envelopes everything stays exact: <var>f</var> = 1/3, not 0.33333334.</p>
+      <figure class="code"><figcaption>ENV-SAMPLES-Y</figcaption><pre>(loop for i below n
+      collect (env-y-at
+               env
+               (if (= n 1)
+                   x0
+                   (+ x0 (/ (* i (- x1 x0))
+                            (1- n))))))</pre></figure>
+    </li>
+    <li>
+      <h3>The row count</h3>
+      <p>As in the original, except that the x range is rounded down with <code>floor</code>. With <code>'(0 0 2.5 1)</code> the Opusmodus version computes 3.5 rows and stops with an error in <code>make-list</code>; the plain version makes 3 rows, at x = 0, 1.25 and 2.5.</p>
+      <figure class="code"><figcaption>N</figcaption><pre>(n (or steps
+       (1+ (floor (- (car (last env 2))
+                     (first env))))))</pre></figure>
+    </li>
+    <li>
+      <h3>noise-at: repeatable random numbers</h3>
+      <p>Common Lisp has no portable way to seed <code>random</code> with a number, so the seeded case uses a small hash instead of a random generator:</p>
+      <p>The seed is multiplied by <code>#x9E3779B9</code> (2³² divided by the golden ratio) and the row number is added. Three rounds of shifting and multiplying then scramble all 32 bits — the “finalizer” of the MurmurHash3 algorithm. The result is scaled to −1.0 … 1.0.</p>
+      <p>The same seed and row always give the same number, in any Lisp. Each row is computed on its own, so row 7 does not depend on how many rows come before it. Without a seed, Common Lisp’s own <code>random</code> is used.</p>
+      <figure class="code"><figcaption>NOISE-AT</figcaption><pre>(flet ((u32 (x) (logand x #xFFFFFFFF)))
+  (let ((h (u32 (+ (* seed #x9E3779B9) i))))
+    (setf h (u32 (* (logxor h (ash h -16))
+                    #x85EBCA6B))
+          h (u32 (* (logxor h (ash h -13))
+                    #xC2B2AE35))
+          h (logxor h (ash h -16)))
+    (- (* 2.0 (/ h #xFFFFFFFF)) 1.0)))</pre></figure>
+      <p class="tnote">Tested: 100 000 values spread evenly over −1 … 1 (mean 0.0009), with no correlation between neighbouring rows or neighbouring seeds.</p>
+    </li>
+    <li>
+      <h3>Build the rows</h3>
+      <p>Two nested loops take the place of <code>mapcar</code> over <code>base</code>. The outer loop runs over the events and carries <var>f</var>, <var>v</var> and the random number side by side; the inner loop multiplies the voice numbers 0 … len − 1 by <var>f</var> · <var>d</var> and rounds if asked.</p>
+      <figure class="code"><figcaption>LOOP</figcaption><pre>(loop for i below n
+      for f in curve
+      for v in vars
+      for r = (if seed
+                  (noise-at seed i)
+                  (- (random 2.0) 1.0))
+      for d = (+ 1.0 (* v r))
+      collect (loop for y below len
+                    for x = (* y f d)
+                    collect (if round (round x) x)))</pre></figure>
+    </li>
+  </ol>
+
+  <h4 class="example">Compared with the original</h4>
+  <p>With variance 0, <code>spread-develop</code> returned exactly the same rows as <code>spread-develop-om</code> (with stand-ins) for 11 and 23 steps and for both docstring examples. Unrounded values differed by at most 0.000004, from exact fractions versus floats. With a seed, the two variants give different random numbers.</p>
+</section>
+
+<!-- ======================================================= -->
+<section id="chain">
+  <div class="sec-head">
+    <div class="label">In the score</div>
+    <h2 class="serif">From rows to voice IDs</h2>
+  </div>
+
+  <details class="src" open>
+    <summary><span>Source · spread-develop.lisp, lines 152–189</span></summary>
+    <pre><span class="ln">152</span><span class="c">;; EVENTS is set earlier in the score, e.g.</span>
+<span class="ln">153</span>(<span class="k">setf</span> events 11)
+<span class="ln">154</span>
+<span class="ln">155</span><span class="c">;; Transposition envelope as offset</span>
+<span class="ln">156</span><span class="c">;; for the chord progression</span>
+<span class="ln">157</span>(<span class="k">setf</span> transp-env '(0 2 10 2 20 3 30 4 40 3 50 6
+<span class="ln">158</span>                   60 4 70 0 80 1 90 2 100 3))
+<span class="ln">159</span>
+<span class="ln">160</span>(list-plot
+<span class="ln">161</span> <span class="c">;; List of integer transpositions according to the</span>
+<span class="ln">162</span> <span class="c">;; number of events</span>
+<span class="ln">163</span> (<span class="k">setf</span> transp
+<span class="ln">164</span>       (mapcar <span class="f">#'round</span>
+<span class="ln">165</span>               (envelope-y
+<span class="ln">166</span>                (envelope-samples transp-env events))))
+<span class="ln">167</span> <span class="kw">:join-points</span> t)
+<span class="ln">168</span>
+<span class="ln">169</span><span class="c">;; Development of selections from the pitch material</span>
+<span class="ln">170</span><span class="c">;; (0 0 0 0 0 0 0 0 0) = unison</span>
+<span class="ln">171</span><span class="c">;; (0 1 2 3 4 5 6 7 8) = successive pitches in scale</span>
+<span class="ln">172</span><span class="c">;; (0 2 4 6 8 10 12 14 16) = every second pitch in scale</span>
+<span class="ln">173</span>(<span class="k">setf</span> spread
+<span class="ln">174</span>      (spread-develop-om
+<span class="ln">175</span>       9 '(0 0 30 1 70 4 100 1) <span class="kw">:steps</span> events <span class="kw">:round</span> t))
+<span class="ln">176</span>
+<span class="ln">177</span><span class="c">;; Add transposition to it</span>
+<span class="ln">178</span>(<span class="k">setf</span> indexes
+<span class="ln">179</span>      (<span class="k">loop</span> <span class="k">for</span> i <span class="k">in</span> transp
+<span class="ln">180</span>            <span class="k">for</span> j <span class="k">in</span> spread
+<span class="ln">181</span>            <span class="k">collect</span> (integer-transpose i j)))
+<span class="ln">182</span>
+<span class="ln">183</span><span class="c">;; Convert to voices from high to low</span>
+<span class="ln">184</span>(list-plot
+<span class="ln">185</span> (<span class="k">setf</span> voice-ids
+<span class="ln">186</span>       (reverse
+<span class="ln">187</span>        (matrix-transpose
+<span class="ln">188</span>         indexes)))
+<span class="ln">189</span> <span class="kw">:join-points</span> t)</pre>
+  </details>
+  <p class="gist">The usage code combines the two envelopes and reshapes the result into one ID line per voice. Traced with <code>events</code> = 11.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Transposition per event</h3>
+      <p>The transposition envelope is sampled at 11 events and rounded. At x = 0, 10 … 100 it hits its own points exactly: <strong>(2 2 3 4 3 6 4 0 1 2 3)</strong>.</p>
+      <figure class="code"><figcaption>TRANSP</figcaption><pre>(mapcar #'round
+        (envelope-y
+         (envelope-samples transp-env events)))</pre></figure>
+    </li>
+    <li>
+      <h3>Spread rows</h3>
+      <p><code>(spread-develop-om 9 '(0 0 30 1 70 4 100 1) :steps events :round t)</code> — the 11 rows traced above.</p>
+    </li>
+    <li>
+      <h3>Add the transposition</h3>
+      <p><code>integer-transpose</code> adds <var>t</var> to every ID of its row. Row 5, (0 2 5 8 10 12 15 18 20), with <var>t</var> = 6 becomes (6 8 11 14 16 18 21 24 26).</p>
+      <figure class="code"><figcaption>INDEXES</figcaption><pre>(loop for i in transp
+      for j in spread
+      collect (integer-transpose i j))</pre></figure>
+<div class="tbl"><table><thead><tr><th>event</th><th><span class="nc">t</span></th><th><span class="nc">f</span></th><th class=l>IDs, voice 1 → 9</th></tr></thead><tbody><tr><td>0</td><td>2</td><td>0</td><td class="ids">2 2 2 2 2 2 2 2 2</td></tr><tr><td>1</td><td>2</td><td>1/3</td><td class="ids">2 2 3 3 3 4 4 4 5</td></tr><tr><td>2</td><td>3</td><td>2/3</td><td class="ids">3 4 4 5 6 6 7 8 8</td></tr><tr><td>3</td><td>4</td><td>1</td><td class="ids">4 5 6 7 8 9 10 11 12</td></tr><tr><td>4</td><td>3</td><td>1.75</td><td class="ids">3 5 7 8 10 12 13 15 17</td></tr><tr><td>5</td><td>6</td><td>2.5</td><td class="ids">6 8 11 14 16 18 21 24 26</td></tr><tr><td>6</td><td>4</td><td>3.25</td><td class="ids">4 7 10 14 17 20 24 27 30</td></tr><tr><td>7</td><td>0</td><td>4</td><td class="ids"><i>0</i> 4 8 12 16 20 24 28 32</td></tr><tr><td>8</td><td>1</td><td>3</td><td class="ids">1 4 7 10 13 16 19 22 25</td></tr><tr><td>9</td><td>2</td><td>2</td><td class="ids">2 4 6 8 10 12 14 16 18</td></tr><tr><td>10</td><td>3</td><td>1</td><td class="ids">3 4 5 6 7 8 9 10 11</td></tr></tbody></table></div>
+      <p class="tnote"><span class="key lift"></span>ID 0 at event 7: with transposition 0, the lowest voice reaches g1, the lowest note of the pitch material (see <a href="#notes">notes</a>).</p>
+    </li>
+    <li>
+      <h3>From events to voices</h3>
+      <p><code>indexes</code> holds 11 rows of 9 IDs, one chord per event. <code>matrix-transpose</code> turns rows into columns: 9 lists of 11 IDs, one line per voice through time. In plain Common Lisp: <code>(apply #'mapcar #'list indexes)</code>.</p>
+    </li>
+    <li>
+      <h3>Highest voice first</h3>
+      <p>After turning, the first list is the bottom voice, so <code>reverse</code> puts the top voice first. Because one factor applies to all voices of a row, the voices never cross and the order stays high to low throughout. The bottom voice is the transposition envelope itself.</p>
+      <figure class="code"><figcaption>VOICE-IDS</figcaption><pre>(reverse (matrix-transpose indexes))</pre></figure>
+<div class="tbl"><table><thead><tr><th>voice \ event</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th></tr></thead><tbody><tr><td>9 top</td><td>2</td><td>5</td><td>8</td><td>12</td><td>17</td><td>26</td><td>30</td><td>32</td><td>25</td><td>18</td><td>11</td></tr><tr><td>8</td><td>2</td><td>4</td><td>8</td><td>11</td><td>15</td><td>24</td><td>27</td><td>28</td><td>22</td><td>16</td><td>10</td></tr><tr><td>7</td><td>2</td><td>4</td><td>7</td><td>10</td><td>13</td><td>21</td><td>24</td><td>24</td><td>19</td><td>14</td><td>9</td></tr><tr><td>6</td><td>2</td><td>4</td><td>6</td><td>9</td><td>12</td><td>18</td><td>20</td><td>20</td><td>16</td><td>12</td><td>8</td></tr><tr><td>5</td><td>2</td><td>3</td><td>6</td><td>8</td><td>10</td><td>16</td><td>17</td><td>16</td><td>13</td><td>10</td><td>7</td></tr><tr><td>4</td><td>2</td><td>3</td><td>5</td><td>7</td><td>8</td><td>14</td><td>14</td><td>12</td><td>10</td><td>8</td><td>6</td></tr><tr><td>3</td><td>2</td><td>3</td><td>4</td><td>6</td><td>7</td><td>11</td><td>10</td><td>8</td><td>7</td><td>6</td><td>5</td></tr><tr><td>2</td><td>2</td><td>2</td><td>4</td><td>5</td><td>5</td><td>8</td><td>7</td><td>4</td><td>4</td><td>4</td><td>4</td></tr><tr><td>1 = t</td><td>2</td><td>2</td><td>3</td><td>4</td><td>3</td><td>6</td><td>4</td><td><i>0</i></td><td>1</td><td>2</td><td>3</td></tr></tbody></table></div>
+    </li>
+    <li>
+      <h3>Pitches for the score, partials for Pd</h3>
+      <p>Each ID is looked up twice. <code>(nth j pitch-mat)</code> gives the piano pitch for the score; <code>(nth j multiplicators)</code> gives its partial number, which the Pd sequencer multiplies by 12.249859 Hz. At event 7, the top voice’s ID 32 becomes cs7 in the score and partial 181, 2217.22 Hz, in Pd.</p>
+      <figure class="code"><figcaption>FROM NAMES.OPMO, REFORMATTED</figcaption><pre>(setf multiplicators
+      (first (matrix-transpose harm-midis)))
+
+(setf harm-ids
+      (loop for i in voice-ids
+            collect (loop for j in i
+                          collect (nth j multiplicators))))
+
+(setf pitches
+      (loop for i in voice-ids
+            collect
+              (gen-divide
+               parts-list
+               (loop for j in i
+                     collect (nth j pitch-mat)))))</pre></figure>
+    </li>
+  </ol>
+
+  <h4 class="example">Read as pitches and partials</h4>
+<div class="tbl"><table><thead><tr><th>event</th><th class=l>IDs, voice 1 → 9</th><th class=l>pitches</th><th class=l>partials</th></tr></thead><tbody><tr><td>0</td><td class="ids">2 2 2 2 2 2 2 2 2</td><td class="ids">g2 g2 g2 g2 g2 g2 g2 g2 g2</td><td class="ids">8 8 8 8 8 8 8 8 8</td></tr><tr><td>3</td><td class="ids">4 5 6 7 8 9 10 11 12</td><td class="ids">d3 g3 gs3 a3 bb3 d4 e4 g4 gs4</td><td class="ids">12 16 17 18 19 24 27 32 34</td></tr><tr><td>9</td><td class="ids">2 4 6 8 10 12 14 16 18</td><td class="ids">g2 d3 gs3 bb3 e4 gs4 bb4 e5 g5</td><td class="ids">8 12 17 19 27 34 38 54 64</td></tr><tr><td>8</td><td class="ids">1 4 7 10 13 16 19 22 25</td><td class="ids">d2 d3 a3 e4 a4 e5 gs5 d6 fs6</td><td class="ids">6 12 18 27 36 54 68 96 121</td></tr><tr><td>7</td><td class="ids"><i>0</i> 4 8 12 16 20 24 28 <i>32</i></td><td class="ids">g1 d3 bb3 gs4 e5 a5 f6 a6 cs7</td><td class="ids">4 12 19 34 54 72 114 144 181</td></tr></tbody></table></div>
+  <p class="tnote">Event 3 (spread 1) takes nine neighbouring pitches of the material, d3 to gs4. Event 9 (spread 2) takes every second pitch from g2 upward. Event 7 (spread 4) spans the whole material, g1 to cs7, in every fourth pitch.</p>
+</section>
+
+<!-- ======================================================= -->
+<section id="notes">
+  <div class="sec-head">
+    <div class="label">Review</div>
+    <h2 class="serif">Things worth knowing</h2>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <h3>IDs are positions in the pitch material</h3>
+      <p>An ID is not a partial number. It is a position in the 33 pitches of the material: without transposition ID 0 is g1 (partial 4), ID 2 is g2 (partial 8), ID 32 is cs7 (partial 181). Partial numbers only come in at the end, through <code>multiplicators</code>, for the Pd sequencer.</p>
+      <p>The bottom voice of every row is 0 before transposition, so the lowest ID of an event is the transposition itself. At event 7 the transposition envelope reaches its point (70, 0), and voice 1 lands on g1.</p>
+    </div>
+
+    <div class="note">
+      <h3>The highest ID must stay at 32</h3>
+      <p><code>(nth j pitch-mat)</code> and <code>(nth j multiplicators)</code> return NIL for any ID above 32, so the voice would get no pitch and the sequencer no partial. The envelopes of the piece reach exactly 32: in the 11-event trace at event 7 (0 + 8 × 4), and with the piece’s 100 events at events 67–69 (traced with the stand-in resampling). Raising the transposition or the spread around x = 70, or adding variance, runs past the end: with variance 0.25 and seed 7, event 7 reached ID 35.</p>
+    </div>
+
+    <div class="note">
+      <h3>Doublings below f = 1</h3>
+      <p>With a spread factor between 0 and 1, some voices share an ID (event 1: 2 2 3 3 3 4 4 4 5), so several voices sit on the same pitch. Nine distinct IDs need <var>f</var> ≥ 1. At <var>f</var> = 0 all voices form the unison the usage comment describes.</p>
+    </div>
+
+    <div class="note">
+      <h3>Exact halves go to the even ID</h3>
+      <p>Common Lisp’s <code>round</code> rounds 2.5 to 2 and 7.5 to 8. With <var>f</var> = 2.5 the row becomes (0 2 5 8 10 12 15 18 20), with steps 2 3 3 2 2 3 3 2. Rounding halves up gives (0 3 5 8 10 13 15 18 20), steps 3 2 3 2 3 2 3 2 — a regular alternation. For that, replace <code>(round x)</code> in <code>spread-develop</code> with:</p>
+      <pre>(floor (+ x 1/2))</pre>
+      <p style="margin-top:12px">In Opusmodus the envelope values are floats and can land a hair above or below .5, so in exactly these cases the two variants may differ.</p>
+    </div>
+
+    <div class="note">
+      <h3>Variance above 1 turns the fan over</h3>
+      <p><var>d</var> = 1 + <var>v</var> · <var>r</var> reaches 0 when <var>v</var> · <var>r</var> = −1. With variance 1.5 a row can get a negative factor and therefore negative values; a test gave rows like (0 0 −1 −1 −1). After transposition these can fall below ID 0, and <code>(nth -1 pitch-mat)</code> stops with an error, because <code>nth</code> accepts no negative index. Keep variance below 1: 0.25 means the spread breathes by ±25 %.</p>
+    </div>
+
+    <div class="note">
+      <h3>Check the resampling once in Opusmodus</h3>
+      <p>The plain version assumes that <code>envelope-samples</code> includes both the first and the last x and interpolates linearly, as the docstring implies. The check at the end of <code>spread-develop.lisp</code> returns <code>(:ENVELOPE T :ROWS T)</code> if that holds. If it returns NIL, <code>env-samples-y</code> needs adjusting to Opusmodus’s sampling.</p>
+    </div>
+  </div>
+
+  <footer class="src">
+    <p><span class="label">Method</span> All numbers on this page come from running both variants in SBCL 2.2.9.</p>
+    <p><span class="label">Sources</span> No public reference page for <code>envelope-samples</code> or <code>rnd-number</code> was found; the stand-ins follow the behaviour described in the function’s own docstring.</p>
+  </footer>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var box = document.getElementById('idchart');
+  if (!box) return;
+  var svg = box.querySelector('svg');
+  var data = JSON.parse(box.getAttribute('data-voices'));
+  var tip = box.querySelector('.tip');
+  var cross = svg.querySelector('.cross');
+  var L = +box.getAttribute('data-l'), R = +box.getAttribute('data-r');
+  var T = +box.getAttribute('data-t'), B = +box.getAttribute('data-b');
+  var ymax = +box.getAttribute('data-ymax');
+  var W = +box.getAttribute('data-w');
+  var ev = data[0].length;
+  function sx(i) { return L + i * (R - L) / (ev - 1); }
+  function sy(v) { return B - v * (B - T) / ymax; }
+  var dots = svg.querySelector('.dots');
+  function show(i) {
+    cross.setAttribute('x1', sx(i)); cross.setAttribute('x2', sx(i));
+    cross.style.display = '';
+    var html = '<div class="th">event ' + i + '</div>';
+    var marks = '';
+    for (var k = 0; k < data.length; k++) {
+      var v = data[k][i];
+      html += 'voice ' + (data.length - k) + '  ' + (v < 10 ? ' ' : '') + v + '<br>';
+      marks += '<circle class="dot" r="4" cx="' + sx(i) + '" cy="' + sy(v) + '"></circle>';
+    }
+    dots.innerHTML = marks;
+    tip.innerHTML = html;
+    tip.hidden = false;
+    var rect = svg.getBoundingClientRect();
+    var scale = rect.width / W;
+    var px = sx(i) * scale;
+    var tw = tip.offsetWidth;
+    var left = px + 14;
+    if (left + tw > box.clientWidth + box.scrollLeft - 4) left = px - tw - 14;
+    tip.style.left = left + 'px';
+  }
+  function hide() { tip.hidden = true; cross.style.display = 'none'; dots.innerHTML = ''; }
+  svg.addEventListener('pointermove', function (e) {
+    var rect = svg.getBoundingClientRect();
+    var x = (e.clientX - rect.left) * W / rect.width;
+    var i = Math.round((x - L) / ((R - L) / (ev - 1)));
+    if (i < 0) i = 0; if (i > ev - 1) i = ev - 1;
+    show(i);
+  });
+  svg.addEventListener('pointerleave', hide);
+  hide();
+})();
+</script>
+
+</body>
+</html>

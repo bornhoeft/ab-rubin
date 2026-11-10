@@ -1,0 +1,1129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Inside fit-sum-ratio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+:root {
+  --paper: #F3F5F2;
+  --surface: #FBFCFA;
+  --code: #E6EAE5;
+  --ink: #1B2226;
+  --muted: #58626A;
+  --faint: #879197;
+  --rule: #D2D8D3;
+  --accent: #285A8C;
+  --accent-soft: #DAE5EF;
+  --mark: #92590A;
+  --mark-soft: #F2E3C9;
+  --blk-a: #C3D5E6;
+  --blk-b: #A3BED8;
+  --bar: #285A8C;
+  --serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  --cond: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #13171A;
+    --surface: #191E22;
+    --code: #1E2529;
+    --ink: #E1E6E3;
+    --muted: #9AA5AB;
+    --faint: #6E797F;
+    --rule: #2B3338;
+    --accent: #8BB2DC;
+    --accent-soft: #1F2D3A;
+    --mark: #E0A84F;
+    --mark-soft: #3A2D18;
+    --blk-a: #2A4461;
+    --blk-b: #36567A;
+    --bar: #8BB2DC;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #13171A;
+  --surface: #191E22;
+  --code: #1E2529;
+  --ink: #E1E6E3;
+  --muted: #9AA5AB;
+  --faint: #6E797F;
+  --rule: #2B3338;
+  --accent: #8BB2DC;
+  --accent-soft: #1F2D3A;
+  --mark: #E0A84F;
+  --mark-soft: #3A2D18;
+  --blk-a: #2A4461;
+  --blk-b: #36567A;
+  --bar: #8BB2DC;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+  padding-inline: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, pre, .mono { font-family: var(--mono); }
+p code, li code, td code, dd code, h3 code, figcaption code {
+  font-size: 0.86em;
+  background: var(--code);
+  padding: 0.08em 0.32em;
+  border-radius: 3px;
+}
+
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  gap: 64px;
+  padding-block: 56px 96px;
+}
+main { max-width: 760px; min-width: 0; }
+main p, main li, main dd { max-width: 66ch; }
+
+/* ---------- side index ---------- */
+nav.toc {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 40px);
+  align-self: start;
+  font-family: var(--cond);
+  font-size: 14px;
+}
+nav.toc .label { margin-bottom: 12px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+nav.toc a {
+  display: grid;
+  gap: 0;
+  padding: 7px 10px;
+  border-radius: 3px;
+  text-decoration: none;
+  color: var(--ink);
+}
+nav.toc a:hover { background: var(--code); }
+nav.toc a span:first-child { font-family: var(--mono); font-size: 13px; }
+nav.toc a span:last-child { color: var(--muted); font-size: 12.5px; }
+
+.label {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- header ---------- */
+header.intro { display: grid; gap: 14px; padding-bottom: 36px; border-bottom: 1px solid var(--rule); }
+header.intro h1 {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(2.1rem, 5vw, 2.7rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+header.intro .lede { font-size: 20px; line-height: 1.5; margin: 0; color: var(--ink); }
+header.intro .meta { font-size: 14.5px; color: var(--muted); margin: 0; }
+
+/* ---------- sections ---------- */
+section { padding-block: 52px 8px; scroll-margin-top: 24px; }
+section + section { border-top: 1px solid var(--rule); }
+.sec-head { display: grid; gap: 6px; margin-bottom: 18px; }
+.sec-head h2 {
+  margin: 0;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: clamp(1.45rem, 3.4vw, 1.8rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.sec-head h2.serif { font-family: var(--serif); font-weight: 600; letter-spacing: 0; }
+.sig {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  color: var(--muted);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.gist { font-size: 19px; line-height: 1.5; margin: 4px 0 20px; }
+
+h3 {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 19px;
+  line-height: 1.3;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+h4.example {
+  margin: 28px 0 10px;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+p { margin: 0 0 14px; }
+
+/* ---------- steps ---------- */
+ol.steps { list-style: none; margin: 8px 0 0; padding: 0; counter-reset: step; display: grid; gap: 30px; }
+ol.steps > li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 14px;
+}
+ol.steps > li::before {
+  content: counter(step);
+  grid-column: 1;
+  grid-row: 1 / span 12;
+  align-self: start;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+}
+ol.steps > li > * { grid-column: 2; }
+ol.steps > li > *:last-child { margin-bottom: 0; }
+
+/* ---------- code ---------- */
+figure.code { margin: 10px 0 14px; }
+figure.code figcaption {
+  font-family: var(--cond);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin-bottom: 4px;
+}
+pre {
+  margin: 0;
+  background: var(--code);
+  color: var(--ink);
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-x: auto;
+  tab-size: 2;
+}
+pre .c { color: var(--faint); }
+
+.formula {
+  margin: 12px 0 16px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--serif);
+  font-size: 21px;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.formula var { font-style: italic; }
+.formula small { display: block; font-size: 14px; color: var(--muted); white-space: normal; margin-top: 4px; }
+
+/* ---------- tables ---------- */
+.tbl { overflow-x: auto; margin: 12px 0 8px; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+.nc { text-transform: none; }
+th {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ink);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td.l, th.l { text-align: left; }
+tfoot td { border-top: 1px solid var(--ink); border-bottom: 0; font-weight: 500; }
+td.moved { background: var(--mark-soft); color: var(--mark); font-weight: 500; }
+td.lift { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+td.dim { color: var(--faint); }
+.tnote { font-size: 14.5px; color: var(--muted); margin: 6px 0 14px; }
+.key { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; vertical-align: -0.05em; margin-right: 0.3em; }
+.key.moved { background: var(--mark-soft); box-shadow: inset 0 0 0 1px var(--mark); }
+.key.lift { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* ---------- overview flow ---------- */
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  margin: 22px 0 26px;
+}
+.flow .node {
+  flex: 1 1 128px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px 12px 12px;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+}
+.flow .node b { font-family: var(--cond); font-weight: 600; font-size: 14.5px; }
+.flow .node span { font-size: 14px; line-height: 1.4; color: var(--muted); }
+.flow .node code { font-size: 12px; background: none; padding: 0; color: var(--accent); }
+.flow .node.out { background: var(--accent-soft); border-color: transparent; }
+.flow .node.out b { color: var(--accent); }
+.flow .arrow { flex: 0 0 auto; align-self: center; color: var(--faint); font-family: var(--cond); font-size: 18px; }
+.halves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; margin-top: -10px; }
+.halves p { font-size: 15px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 8px; }
+
+dl.gloss {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 22px;
+  margin: 14px 0 6px;
+  font-size: 16px;
+}
+dl.gloss dt { font-family: var(--mono); font-size: 14px; color: var(--accent); padding-top: 2px; }
+dl.gloss dd { margin: 0; }
+
+/* ---------- rhythm ruler ---------- */
+figure.ruler-fig { margin: 22px 0 10px; }
+.ruler-scroll { overflow-x: auto; padding-bottom: 4px; }
+.ruler {
+  min-width: 620px;
+  display: grid;
+  grid-template-columns: repeat(32, minmax(0, 1fr));
+  grid-template-rows: 64px 38px 10px 18px;
+}
+.ruler .cbar { grid-row: 1; display: flex; align-items: flex-end; padding: 0 3px 4px; }
+.ruler .cbar i { display: block; width: 100%; background: var(--bar); opacity: 0.55; border-radius: 2px 2px 0 0; min-height: 3px; }
+.ruler .blk {
+  grid-row: 2;
+  display: grid;
+  place-items: center;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ink);
+  border-right: 2px solid var(--paper);
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.ruler .blk.a { background: var(--blk-a); }
+.ruler .blk.b { background: var(--blk-b); }
+.ruler .tk { grid-row: 3; border-left: 1px solid var(--rule); }
+.ruler .tk.bar { border-left: 1.5px solid var(--muted); }
+.ruler .tk.end { border-right: 1.5px solid var(--muted); }
+.ruler .bn { grid-row: 4; grid-column: span 8; font-family: var(--cond); font-size: 11.5px; color: var(--faint); padding-left: 3px; }
+figure.ruler-fig figcaption { font-size: 14.5px; color: var(--muted); margin-top: 8px; max-width: 66ch; }
+
+/* ---------- notes ---------- */
+.notes { display: grid; gap: 0; margin-top: 8px; }
+.note { padding-block: 20px; border-top: 1px solid var(--rule); }
+.note:first-child { border-top: 0; padding-top: 4px; }
+.note h3 { margin-bottom: 8px; }
+
+.truth td:nth-child(3), .truth td:nth-child(4) { color: var(--accent); }
+
+footer.src {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  font-size: 14.5px;
+  color: var(--muted);
+  display: grid;
+  gap: 6px;
+}
+footer.src p { margin: 0; }
+
+@media (max-width: 920px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 28px; padding-block: 36px 72px; }
+  nav.toc { position: static; }
+  nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  header.intro .lede { font-size: 18px; }
+  .gist { font-size: 17.5px; }
+  .flow { flex-direction: column; }
+  .flow .arrow { transform: rotate(90deg); }
+  .halves { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+  dl.gloss { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  dl.gloss dd { margin-bottom: 8px; }
+  ol.steps > li { grid-template-columns: 30px minmax(0, 1fr); column-gap: 10px; }
+  .formula { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+html { scroll-behavior: smooth; }
+
+/* ---------- source listings ---------- */
+details.src { margin: 2px 0 24px; border: 1px solid var(--rule); border-radius: 4px; background: var(--code); }
+details.src summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+details.src summary::-webkit-details-marker { display: none; }
+details.src summary::after { content: "Hide"; color: var(--accent); }
+details.src:not([open]) summary::after { content: "Show"; }
+details.src summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+details.src pre { border-top: 1px solid var(--rule); border-radius: 0 0 4px 4px; padding: 12px 16px 14px 0; font-size: 13px; }
+pre .ln { display: inline-block; width: 3.4em; padding-right: 1.1em; text-align: right; color: var(--faint); user-select: none; -webkit-user-select: none; }
+pre .k { font-weight: 500; color: var(--ink); }
+pre .s { color: var(--mark); }
+pre .c { color: var(--faint); font-style: italic; }
+pre .kw, pre .f { color: var(--accent); }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Contents">
+  <div class="label">fit-sum-ratio.lisp</div>
+  <ol>
+    <li><a href="#overview"><span>overview</span><span>the idea, the units</span></a></li>
+    <li><a href="#grid-unit"><span>grid-unit</span><span>helper</span></a></li>
+    <li><a href="#fix-rounding"><span>fix-rounding</span><span>the exact part</span></a></li>
+    <li><a href="#check-sum-range"><span>check-sum-range</span><span>early guard</span></a></li>
+    <li><a href="#fit-sum"><span>fit-sum</span><span>variant A, plain Lisp</span></a></li>
+    <li><a href="#fit-sum-om"><span>fit-sum-om</span><span>variant B, Opusmodus</span></a></li>
+    <li><a href="#notes"><span>notes</span><span>things worth knowing</span></a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="intro">
+  <div class="label">Code walkthrough</div>
+  <h1>Inside fit-sum-ratio</h1>
+  <p class="lede">Five functions that turn a contour into <var>n</var> durations with an exact total, a shortest and a longest value, all on a rhythmic grid. Every step of the calculation, in plain terms, traced with real numbers.</p>
+  <p class="meta">All traces were run in SBCL 2.2.9. The Opusmodus functions <code>half-sine</code>, <code>gen-transition</code> and <code>vector-map</code> are not available there, so the worked examples use explicit contours, and <code>fit-sum-om</code> was tested with stand-ins (marked where it matters).</p>
+</header>
+
+<!-- ======================================================= -->
+<section id="overview">
+  <div class="sec-head">
+    <div class="label">Overview</div>
+    <h2 class="serif">The idea in one picture</h2>
+  </div>
+  <p>The file answers one question: how do I get <var>n</var> rhythmic values that follow a shape, stay between a shortest and a longest value, sit on a grid, and add up to <em>exactly</em> a given length?</p>
+
+  <div class="flow" role="list">
+    <div class="node" role="listitem"><b>Contour</b><span>any list of numbers, e.g. <code>half-sine</code></span></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><b>Normalise</b><span>lowest point 0, highest point 1</span></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><b>Bend</b><span>map to MIN…MAX, curvature tuned until the sum fits</span></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><b>Snap</b><span>scale, round to the grid, repair the sum</span></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node out" role="listitem"><b>Exact ratios</b><span>e.g. <code>(1/4 5/8 1 …)</code></span></div>
+  </div>
+  <div class="halves">
+    <p><strong>Get close</strong> — normalise and bend. Done with floating-point numbers, so the sum is only approximately right. <code>fit-sum</code> and <code>fit-sum-om</code> differ only here.</p>
+    <p><strong>Land exactly</strong> — snap. Done with whole numbers by <code>fix-rounding</code>, so the sum is exact. Both variants share this part.</p>
+  </div>
+
+  <h3>Counting in grid units</h3>
+  <p>The trick behind the exact sum: <code>fix-rounding</code> never adds up 3/8 and 5/8 directly. It counts in whole <em>grid units</em>. On an eighth grid (unit 1/8), 3/8 is 3 units and a total of 4 is 32 units. Whole numbers add without any rounding error; multiplying back by 1/8 at the very end gives exact ratios.</p>
+  <p>The same words come up in every function below:</p>
+  <dl class="gloss">
+    <dt>n</dt><dd>how many values you want</dd>
+    <dt>total</dt><dd>what they must add up to (a ratio, e.g. <code>8</code>)</dd>
+    <dt>min, max</dt><dd>shortest and longest allowed value</dd>
+    <dt>quantize</dt><dd>the list of divisions allowed, e.g. <code>'(1 2 4 8)</code></dd>
+    <dt>unit</dt><dd>the finest grid step those divisions share, e.g. 1/8</dd>
+    <dt>steps</dt><dd>the total, counted in units (8 ÷ 1/8 = 64)</dd>
+    <dt>lo, hi</dt><dd>min and max, counted in units</dd>
+    <dt>rest</dt><dd>units still missing (positive) or too many (negative)</dd>
+    <dt>err</dt><dd>how much a value lost or gained by rounding</dd>
+  </dl>
+</section>
+
+<!-- ======================================================= -->
+<section id="grid-unit">
+  <div class="sec-head">
+    <div class="label">Helper</div>
+    <h2>grid-unit</h2>
+    <div class="sig">(grid-unit quantize) → ratio</div>
+  </div>
+
+  <details class="src" open>
+    <summary><span>Source · fit-sum-ratio.lisp, lines 19–22</span></summary>
+    <pre><span class="ln">19</span>(<span class="k">defun</span> grid-unit (quantize)
+<span class="ln">20</span>  <span class="s">"Smallest common time unit of a QUANTIZE list.</span>
+<span class="ln">21</span><span class="s">'(1 2 4) =&gt; 1/4, '(1 2 4 8) =&gt; 1/8, '(1 2 3) =&gt; 1/6."</span>
+<span class="ln">22</span>  (/ 1 (reduce <span class="f">#'lcm</span> quantize)))</pre>
+  </details>
+  <p class="gist">Finds the finest grid on which every division in the quantize list fits.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Least common multiple</h3>
+      <p><code>(reduce #'lcm quantize)</code> finds the smallest whole number that every entry divides evenly. For <code>'(1 2 4 8)</code> that is 8. For <code>'(1 2 3)</code> it is 6, not 3: halves (3/6) and thirds (2/6) only meet on sixths.</p>
+    </li>
+    <li>
+      <h3>Invert it</h3>
+      <p><code>(/ 1 …)</code> turns the count into a length: one grid unit.</p>
+      <figure class="code"><figcaption>LINE 22</figcaption><pre>(/ 1 (reduce #'lcm quantize))</pre></figure>
+    </li>
+  </ol>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th>quantize</th><th>lcm</th><th>unit</th><th class="l">meaning</th></tr></thead>
+      <tbody>
+        <tr><td>(1 2 4)</td><td>4</td><td>1/4</td><td class="l">quarters of 1</td></tr>
+        <tr><td>(1 2 4 8)</td><td>8</td><td>1/8</td><td class="l">eighths of 1</td></tr>
+        <tr><td>(1 2 3)</td><td>6</td><td>1/6</td><td class="l">halves and thirds together</td></tr>
+        <tr><td>(1 2 3 6)</td><td>6</td><td>1/6</td><td class="l">same grid as (1 2 3)</td></tr>
+        <tr><td>(1 3 4)</td><td>12</td><td>1/12</td><td class="l">thirds and quarters together</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ======================================================= -->
+<section id="fix-rounding">
+  <div class="sec-head">
+    <div class="label">Core · shared by both variants</div>
+    <h2>fix-rounding</h2>
+    <div class="sig">(fix-rounding values total &amp;key quantize min max) → ratios</div>
+  </div>
+
+  <details class="src" open>
+    <summary><span>Source · fit-sum-ratio.lisp, lines 24–78</span></summary>
+    <pre><span class="ln">24</span>(<span class="k">defun</span> fix-rounding (values total &amp;key (quantize '(1 2 4))
+<span class="ln">25</span>                                       min max)
+<span class="ln">26</span>  <span class="s">"Scales VALUES (ratios) so their sum is TOTAL, snaps every</span>
+<span class="ln">27</span><span class="s">value to the grid given by QUANTIZE and distributes the</span>
+<span class="ln">28</span><span class="s">rounding remainder, so that the sum is EXACTLY TOTAL --</span>
+<span class="ln">29</span><span class="s">one grid unit at a time, first where the rounding error was</span>
+<span class="ln">30</span><span class="s">largest, and only within MIN ... MAX.</span>
+<span class="ln">31</span><span class="s">MIN/MAX are ratios; MIN defaults to one grid unit, so no</span>
+<span class="ln">32</span><span class="s">value can collapse to zero.</span>
+<span class="ln">33</span><span class="s">Ex.:</span>
+<span class="ln">34</span><span class="s"> (fix-rounding '(1/4 1/8 1/4 3/4 1 3/8) 4</span>
+<span class="ln">35</span><span class="s">               :quantize '(1 2 4))</span>
+<span class="ln">36</span><span class="s"> =&gt; (1/2 1/4 1/4 1 3/2 1/2)</span>
+<span class="ln">37</span><span class="s"> (fix-rounding '(1/4 1/8 1/4 3/4 1 3/8) 4</span>
+<span class="ln">38</span><span class="s">               :quantize '(1 2 4 8))</span>
+<span class="ln">39</span><span class="s"> =&gt; (3/8 1/8 3/8 9/8 3/2 1/2)"</span>
+<span class="ln">40</span>  (<span class="k">let*</span> ((unit  (grid-unit quantize))
+<span class="ln">41</span>         (steps (round (/ total unit)))
+<span class="ln">42</span>         (lo    (<span class="k">if</span> min (max 1 (ceiling (/ min unit))) 1))
+<span class="ln">43</span>         (hi    (<span class="k">if</span> max (floor (/ max unit)) steps))
+<span class="ln">44</span>         (raw   (<span class="k">let</span> ((s (reduce <span class="f">#'+</span> values)))
+<span class="ln">45</span>                  (mapcar (<span class="k">lambda</span> (x)
+<span class="ln">46</span>                            (/ (* x total) s unit))
+<span class="ln">47</span>                          values)))
+<span class="ln">48</span>         (n     (length raw))
+<span class="ln">49</span>         (ints  (mapcar (<span class="k">lambda</span> (x)
+<span class="ln">50</span>                          (min hi (max lo (floor x))))
+<span class="ln">51</span>                        raw)))
+<span class="ln">52</span>    (<span class="k">assert</span> (&lt;= (* n lo) steps (* n hi)) (total)
+<span class="ln">53</span>            <span class="s">"~a units cannot be split into ~a values ~</span>
+<span class="ln">54</span><span class="s">             between ~a and ~a units."</span>
+<span class="ln">55</span>            steps n lo hi)
+<span class="ln">56</span>        (<span class="k">loop</span> <span class="k">for</span> rest = (- steps (reduce <span class="f">#'+</span> ints))
+<span class="ln">57</span>          <span class="k">for</span> moved = 0
+<span class="ln">58</span>          <span class="k">while</span> (/= rest 0)
+<span class="ln">59</span>          <span class="k">do</span> (<span class="k">let</span> ((err (mapcar <span class="f">#'-</span> raw ints)))
+<span class="ln">60</span>               (<span class="k">loop</span> <span class="k">for</span> i <span class="k">in</span> (sort (<span class="k">loop</span> <span class="k">for</span> k <span class="k">from</span> 0
+<span class="ln">61</span>                                          <span class="k">below</span> n
+<span class="ln">62</span>                                          <span class="k">collect</span> k)
+<span class="ln">63</span>                                    (<span class="k">if</span> (plusp rest)
+<span class="ln">64</span>                                        <span class="f">#'&gt;</span> <span class="f">#'&lt;</span>)
+<span class="ln">65</span>                                    <span class="kw">:key</span> (<span class="k">lambda</span> (k)
+<span class="ln">66</span>                                           (nth k err)))
+<span class="ln">67</span>                     <span class="k">while</span> (/= rest 0)
+<span class="ln">68</span>                     <span class="k">do</span> (<span class="k">let</span> ((d (<span class="k">if</span> (plusp rest) 1 -1)))
+<span class="ln">69</span>                          (<span class="k">when</span> (&lt;= lo (+ (nth i ints) d)
+<span class="ln">70</span>                                    hi)
+<span class="ln">71</span>                            (<span class="k">incf</span> (nth i ints) d)
+<span class="ln">72</span>                            (<span class="k">decf</span> rest d)
+<span class="ln">73</span>                            (<span class="k">incf</span> moved))))
+<span class="ln">74</span>               (<span class="k">when</span> (zerop moved)
+<span class="ln">75</span>                 (<span class="k">error</span> <span class="s">"~a units left over -- MIN/MAX ~</span>
+<span class="ln">76</span><span class="s">                         block any further correction."</span>
+<span class="ln">77</span>                        rest))))
+<span class="ln">78</span>    (mapcar (<span class="k">lambda</span> (i) (* i unit)) ints)))</pre>
+  </details>
+  <p class="gist">Takes any list of positive numbers, stretches it to the total, puts every value on the grid and repairs the rounding so that the sum is exact.</p>
+
+  <h4 class="example">Worked example</h4>
+  <pre>(fix-rounding '(1/4 1/8 1/4 3/4 1 3/8) 4
+              :quantize '(1 2 4))</pre>
+
+  <ol class="steps" style="margin-top:26px">
+    <li>
+      <h3>Grid unit and the total in units</h3>
+      <p>The grid is 1/4, so the total of 4 becomes <strong>16 units</strong>. From here on, the goal is simply “six whole numbers that add up to 16”.</p>
+      <figure class="code"><figcaption>LINES 40–41</figcaption><pre>(unit  (grid-unit quantize))
+(steps (round (/ total unit)))</pre></figure>
+    </li>
+    <li>
+      <h3>Shortest and longest value, in units</h3>
+      <p><code>lo</code> is MIN in units, rounded <em>up</em> so no value can fall below MIN; it is never less than 1, so no value can become zero. <code>hi</code> is MAX in units, rounded <em>down</em> so no value can exceed MAX.</p>
+      <p>Without MIN, <code>lo</code> is 1 unit. Without MAX, <code>hi</code> is the whole total. In the example neither is given: lo = 1, hi = 16.</p>
+      <figure class="code"><figcaption>LINES 42–43</figcaption><pre>(lo (if min (max 1 (ceiling (/ min unit))) 1))
+(hi (if max (floor (/ max unit)) steps))</pre></figure>
+    </li>
+    <li>
+      <h3>Stretch to the total and convert to units</h3>
+      <p>Each value is multiplied by <var>total</var> ÷ <var>sum</var> and divided by the unit. Read it as two moves:</p>
+      <div class="formula">raw = <var>x</var> · total ÷ sum ÷ unit
+        <small>× total ÷ sum keeps the proportions and makes the list add up to 4 (the input sums to 11/4). ÷ unit expresses the result in grid units.</small></div>
+      <p>The raw values add up to exactly 16, but they are not whole numbers: 16/11, 8/11, 16/11 … ≈ 1.455, 0.727, 1.455 …</p>
+      <figure class="code"><figcaption>LINES 44–47</figcaption><pre>(raw (let ((s (reduce #'+ values)))
+       (mapcar (lambda (x)
+                 (/ (* x total) s unit))
+               values)))</pre></figure>
+    </li>
+    <li>
+      <h3>Round down, then keep inside lo…hi</h3>
+      <p>Every raw value is rounded down with <code>floor</code>, then pushed up to <code>lo</code> or down to <code>hi</code> if needed. Rounding down means the list usually ends up a few units short, never over (except where a value was lifted to <code>lo</code>). In the example, 0.727 becomes 0 and is lifted to 1.</p>
+      <figure class="code"><figcaption>LINES 49–51</figcaption><pre>(ints (mapcar (lambda (x)
+                (min hi (max lo (floor x))))
+              raw))</pre></figure>
+    </li>
+    <li>
+      <h3>Can it work at all?</h3>
+      <p>Six values of at least 1 unit need at least 6 units; six values of at most 16 units can hold up to 96. The target has to lie between:</p>
+      <div class="formula"><var>n</var> · lo ≤ steps ≤ <var>n</var> · hi
+        <small>here: 6 ≤ 16 ≤ 96, so the repair in step 6 is guaranteed to succeed.</small></div>
+      <p>If the test fails, no amount of moving units around could help, so the function stops with a message.</p>
+      <figure class="code"><figcaption>LINE 52</figcaption><pre>(assert (&lt;= (* n lo) steps (* n hi)) (total) …)</pre></figure>
+    </li>
+    <li>
+      <h3>Hand out the missing units</h3>
+      <p><code>rest</code> is what is still missing: 16 − 14 = <strong>2 units</strong>. <code>err</code> is what each value lost by rounding (raw − ints): positive means it was rounded down, negative means it was lifted.</p>
+      <p><strong>If rest is positive</strong>, the values are sorted by <code>err</code>, largest first, and each receives one unit, skipping any value already at <code>hi</code>, until rest is 0. <strong>If rest is negative</strong>, the order is reversed (most over-rounded first) and each gives one unit back, skipping values at <code>lo</code>.</p>
+      <p>One pass gives each value at most one unit. If units are still left over, a new pass starts with freshly computed errors. If a whole pass moves nothing, the function stops with an error.</p>
+      <p>This is the <em>largest remainder method</em> (the same idea used to share out parliament seats), with MIN and MAX added as limits.</p>
+      <figure class="code"><figcaption>LINES 59–73, SLIGHTLY CONDENSED</figcaption><pre>(let ((err (mapcar #'- raw ints)))
+  (loop for i in (sort indices
+                       (if (plusp rest) #'&gt; #'&lt;)
+                       :key (lambda (k) (nth k err)))
+        while (/= rest 0)
+        do (let ((d (if (plusp rest) 1 -1)))
+             (when (&lt;= lo (+ (nth i ints) d) hi)
+               (incf (nth i ints) d)
+               (decf rest d)
+               (incf moved)))))</pre></figure>
+    </li>
+    <li>
+      <h3>Back to ratios</h3>
+      <p>Units × 1/4: (2 1 1 4 6 2) becomes <strong>(1/2 1/4 1/4 1 3/2 1/2)</strong>. The sum is 16/4 = 4, exactly, because it was built from whole numbers.</p>
+      <figure class="code"><figcaption>LINE 78</figcaption><pre>(mapcar (lambda (i) (* i unit)) ints)</pre></figure>
+    </li>
+  </ol>
+
+  <h4 class="example">The whole trace</h4>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>#</th><th>input</th><th>raw</th><th>floor</th><th>clamped</th><th>err</th><th>move</th><th>units</th><th>result</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>1/4</td><td>1.455</td><td>1</td><td>1</td><td>+0.455</td><td class="moved">+1 (2nd)</td><td>2</td><td>1/2</td></tr>
+        <tr><td>2</td><td>1/8</td><td>0.727</td><td>0</td><td class="lift">1</td><td>−0.273</td><td class="dim">·</td><td>1</td><td>1/4</td></tr>
+        <tr><td>3</td><td>1/4</td><td>1.455</td><td>1</td><td>1</td><td>+0.455</td><td class="dim">·</td><td>1</td><td>1/4</td></tr>
+        <tr><td>4</td><td>3/4</td><td>4.364</td><td>4</td><td>4</td><td>+0.364</td><td class="dim">·</td><td>4</td><td>1</td></tr>
+        <tr><td>5</td><td>1</td><td>5.818</td><td>5</td><td>5</td><td>+0.818</td><td class="moved">+1 (1st)</td><td>6</td><td>3/2</td></tr>
+        <tr><td>6</td><td>3/8</td><td>2.182</td><td>2</td><td>2</td><td>+0.182</td><td class="dim">·</td><td>2</td><td>1/2</td></tr>
+      </tbody>
+      <tfoot><tr><td>Σ</td><td>11/4</td><td>16</td><td>13</td><td>14</td><td></td><td>+2</td><td>16</td><td>4</td></tr></tfoot>
+    </table>
+  </div>
+  <p class="tnote"><span class="key lift"></span>lifted to lo &nbsp; <span class="key moved"></span>received a unit in step 6. Values 1 and 3 tie at +0.455; the first one won (see <a href="#notes">notes</a> on ties). With <code>:quantize '(1 2 4 8)</code> the same input becomes 32 units, rest is 4, and the four largest errors each get a unit: (3/8 1/8 3/8 9/8 3/2 1/2).</p>
+
+  <h4 class="example">When rest is negative, over several passes</h4>
+  <pre>(fix-rounding '(1 1 1 1 1 20) 4
+              :quantize '(1 2 4 8) :min 1/4)</pre>
+  <p style="margin-top:12px">Unit 1/8, 32 units, lo = 2. Raw values are 1.28 (five times) and 25.6. The five short ones round to 1 and are lifted to 2, the long one rounds to 25: that makes 35 units, so rest = −3. The short values are already at <code>lo</code> and cannot give anything back, so only the long value can, one unit per pass: 25 → 24 → 23 → 22. Result: <strong>(1/4 1/4 1/4 1/4 1/4 11/4)</strong>.</p>
+</section>
+
+<!-- ======================================================= -->
+<section id="check-sum-range">
+  <div class="sec-head">
+    <div class="label">Guard</div>
+    <h2>check-sum-range</h2>
+    <div class="sig">(check-sum-range n total min max quantize)</div>
+  </div>
+
+  <details class="src" open>
+    <summary><span>Source · fit-sum-ratio.lisp, lines 80–91</span></summary>
+    <pre><span class="ln">80</span>(<span class="k">defun</span> check-sum-range (n total min max quantize)
+<span class="ln">81</span>  <span class="s">"Early check -- fails before the bisection is run, and</span>
+<span class="ln">82</span><span class="s">reports the reachable range in ratios rather than in units."</span>
+<span class="ln">83</span>  (<span class="k">let*</span> ((unit  (grid-unit quantize))
+<span class="ln">84</span>         (lo    (max 1 (ceiling (/ min unit))))
+<span class="ln">85</span>         (hi    (floor (/ max unit)))
+<span class="ln">86</span>         (steps (round (/ total unit))))
+<span class="ln">87</span>    (<span class="k">assert</span> (&lt;= (* n lo) steps (* n hi)) (total)
+<span class="ln">88</span>            <span class="s">"Sum ~a not reachable: ~a values from ~a to ~a ~</span>
+<span class="ln">89</span><span class="s">             on a ~a grid give ~a ... ~a."</span>
+<span class="ln">90</span>            total n min max unit
+<span class="ln">91</span>            (* n lo unit) (* n hi unit))))</pre>
+  </details>
+  <p class="gist">Runs the “can it work at all?” test before any curve fitting starts, and explains a failure in ratios rather than in units.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Same conversions as fix-rounding</h3>
+      <p><code>unit</code>, <code>lo</code>, <code>hi</code> and <code>steps</code> are computed exactly as in steps 1–2 above. Here MIN and MAX must be numbers; <code>fit-sum</code> always passes its defaults 1/8 and 1.</p>
+    </li>
+    <li>
+      <h3>Test the range</h3>
+      <p>Again <var>n</var> · lo ≤ steps ≤ <var>n</var> · hi.</p>
+    </li>
+    <li>
+      <h3>Report in musical terms</h3>
+      <p>On failure, the smallest and largest reachable sums are converted back to ratios (<var>n</var> · lo · unit and <var>n</var> · hi · unit), so the message tells you what <em>is</em> possible.</p>
+      <figure class="code"><figcaption>LINES 87–91</figcaption><pre>(assert (&lt;= (* n lo) steps (* n hi)) (total)
+        "Sum ~a not reachable: …"
+        total n min max unit
+        (* n lo unit) (* n hi unit))</pre></figure>
+    </li>
+  </ol>
+
+  <h4 class="example">Examples</h4>
+  <div class="tbl">
+    <table>
+      <thead><tr><th class="l">call</th><th>unit</th><th>lo</th><th>hi</th><th>steps</th><th>reachable</th><th class="l">outcome</th></tr></thead>
+      <tbody>
+        <tr><td>(fit-sum 7 8)</td><td>1/8</td><td>1</td><td>8</td><td>64</td><td>7/8 … 7</td><td class="l">fails: 7 values of at most 1 cannot reach 8</td></tr>
+        <tr><td>(fit-sum 20 8)</td><td>1/8</td><td>1</td><td>8</td><td>64</td><td>5/2 … 20</td><td class="l">passes</td></tr>
+        <tr><td>(fit-sum 100 200 …)*</td><td>1/4</td><td>2</td><td>12</td><td>800</td><td>50 … 300</td><td class="l">passes</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tnote">* the last line of the file: <code>:quantize '(1 2 4) :min 1/2 :max 3</code>. The comment on line 198 follows from the same test: with total 8, MIN 1/8, MAX 1 on an eighth grid, <var>n</var> · 1 ≤ 64 ≤ <var>n</var> · 8, so <var>n</var> can be anything from 8 to 64.</p>
+</section>
+
+<!-- ======================================================= -->
+<section id="fit-sum">
+  <div class="sec-head">
+    <div class="label">Variant A · plain Common Lisp</div>
+    <h2>fit-sum</h2>
+    <div class="sig">(fit-sum n total &amp;key min max quantize shape) → ratios</div>
+  </div>
+
+  <details class="src" open>
+    <summary><span>Source · fit-sum-ratio.lisp, lines 93–134</span></summary>
+    <pre><span class="ln">93</span><span class="c">;;; --------------------------------------------------------</span>
+<span class="ln">94</span><span class="c">;;; Variant A -- plain Common Lisp</span>
+<span class="ln">95</span><span class="c">;;;</span>
+<span class="ln">96</span><span class="c">;;; Normalise the contour to 0.0 ... 1.0, then</span>
+<span class="ln">97</span><span class="c">;;;   value = min + (max - min) * s^gamma</span>
+<span class="ln">98</span><span class="c">;;; s=0 always gives min, s=1 always max -- the extremes</span>
+<span class="ln">99</span><span class="c">;;; do not depend on gamma. Gamma changes only the</span>
+<span class="ln">100</span><span class="c">;;; curvature and with it the sum, and is tuned to the</span>
+<span class="ln">101</span><span class="c">;;; target sum by bisection. fix-rounding then does the</span>
+<span class="ln">102</span><span class="c">;;; last, exact step onto the grid.</span>
+<span class="ln">103</span><span class="c">;;; --------------------------------------------------------</span>
+<span class="ln">104</span>
+<span class="ln">105</span>(<span class="k">defun</span> fit-sum (n total &amp;key (min 1/8) (max 1)
+<span class="ln">106</span>                             (quantize '(1 2 4 8)) shape)
+<span class="ln">107</span>  <span class="s">"N ratios with sum TOTAL, smallest value MIN, largest</span>
+<span class="ln">108</span><span class="s">value MAX, all lying on the QUANTIZE grid.</span>
+<span class="ln">109</span><span class="s">SHAPE is any contour of length N;</span>
+<span class="ln">110</span><span class="s">default: (half-sine n 1 :phase 180)."</span>
+<span class="ln">111</span>  (check-sum-range n total min max quantize)
+<span class="ln">112</span>  (<span class="k">let*</span> ((raw (<span class="k">or</span> shape (half-sine n 1 <span class="kw">:phase</span> 180)))
+<span class="ln">113</span>         (a (reduce <span class="f">#'min</span> raw))
+<span class="ln">114</span>         (b (reduce <span class="f">#'max</span> raw))
+<span class="ln">115</span>         (s (<span class="k">if</span> (= a b)
+<span class="ln">116</span>                (make-list n <span class="kw">:initial-element</span> 0.5d0)
+<span class="ln">117</span>                (mapcar (<span class="k">lambda</span> (x)
+<span class="ln">118</span>                          (coerce (/ (- x a) (- b a))
+<span class="ln">119</span>                                  'double-float))
+<span class="ln">120</span>                        raw)))
+<span class="ln">121</span>         (curve (<span class="k">lambda</span> (g)
+<span class="ln">122</span>                  (mapcar (<span class="k">lambda</span> (x)
+<span class="ln">123</span>                            (+ min (* (- max min)
+<span class="ln">124</span>                                      (expt x g))))
+<span class="ln">125</span>                          s)))
+<span class="ln">126</span>         (gamma (<span class="k">let</span> ((g1 1d-4) (g2 1d4))
+<span class="ln">127</span>                  (<span class="k">dotimes</span> (i 200 (sqrt (* g1 g2)))
+<span class="ln">128</span>                    (<span class="k">let</span> ((m (sqrt (* g1 g2))))
+<span class="ln">129</span>                      (<span class="k">if</span> (&gt; (reduce <span class="f">#'+</span> (funcall curve m))
+<span class="ln">130</span>                             total)
+<span class="ln">131</span>                          (<span class="k">setf</span> g1 m)
+<span class="ln">132</span>                          (<span class="k">setf</span> g2 m)))))))
+<span class="ln">133</span>    (fix-rounding (funcall curve gamma) total
+<span class="ln">134</span>                  <span class="kw">:quantize</span> quantize <span class="kw">:min</span> min <span class="kw">:max</span> max)))</pre>
+  </details>
+  <p class="gist">Follows the contour: high points become long values, low points short ones. It finds how strongly the contour has to be bent for the sum to come out right, then lets fix-rounding land it on the grid.</p>
+
+  <h4 class="example">Worked example</h4>
+  <pre>(fit-sum 8 4 :shape '(2 5 8 7 4 1 0 3))
+<span class="c">;; defaults: :min 1/8 :max 1 :quantize '(1 2 4 8)</span></pre>
+
+  <ol class="steps" style="margin-top:26px">
+    <li>
+      <h3>Check the range</h3>
+      <p><code>check-sum-range</code> first. Eighth grid, total 4 = 32 units, lo = 1, hi = 8: 8 ≤ 32 ≤ 64, so it can work.</p>
+      <figure class="code"><figcaption>LINE 111</figcaption><pre>(check-sum-range n total min max quantize)</pre></figure>
+    </li>
+    <li>
+      <h3>Take the contour</h3>
+      <p>Either your <code>:shape</code>, or <code>(half-sine n 1 :phase 180)</code> — the Opusmodus generator for a half sine wave of length <var>n</var> and amplitude 1, where <code>:phase</code> sets the point at which the wave starts. Only the <em>shape</em> of the contour matters; its actual numbers are thrown away in the next step.</p>
+      <figure class="code"><figcaption>LINE 112</figcaption><pre>(raw (or shape (half-sine n 1 :phase 180)))</pre></figure>
+    </li>
+    <li>
+      <h3>Normalise to 0…1</h3>
+      <p>Find the lowest point <var>a</var> (here 0) and the highest <var>b</var> (here 8), then rescale every point:</p>
+      <div class="formula"><var>s</var> = (<var>x</var> − <var>a</var>) ÷ (<var>b</var> − <var>a</var>)
+        <small>(2 5 8 7 4 1 0 3) → (0.25 0.625 1 0.875 0.5 0.125 0 0.375)</small></div>
+      <p>The lowest point is now always 0 and the highest always 1. The values are turned into double floats, because the next step raises them to fractional powers, which cannot be exact ratios anyway. A completely flat contour (<var>a</var> = <var>b</var>) would mean dividing by zero, so every point simply gets 0.5.</p>
+      <figure class="code"><figcaption>LINES 113–120</figcaption><pre>(a (reduce #'min raw))
+(b (reduce #'max raw))
+(s (if (= a b)
+       (make-list n :initial-element 0.5d0)
+       (mapcar (lambda (x)
+                 (coerce (/ (- x a) (- b a))
+                         'double-float))
+               raw)))</pre></figure>
+    </li>
+    <li>
+      <h3>Bend the contour between MIN and MAX</h3>
+      <div class="formula">value = min + (max − min) · <var>s</var><sup>γ</sup></div>
+      <p>Where <var>s</var> = 0 the value is always MIN; where <var>s</var> = 1 it is always MAX, whatever γ is. γ (gamma) only bends what lies in between. With γ = 1 the mapping is a straight line. With γ &gt; 1 the in-between values sag towards MIN (0.5² = 0.25); with γ &lt; 1 they bulge towards MAX (0.5<sup>0.5</sup> ≈ 0.71).</p>
+      <p>Because every in-between value gets smaller as γ grows, the sum gets smaller too — steadily, never jumping back. γ is a single dial that turns in one direction, and that is what makes the search in step 5 possible.</p>
+      <figure class="code"><figcaption>LINES 121–125</figcaption><pre>(curve (lambda (g)
+         (mapcar (lambda (x)
+                   (+ min (* (- max min)
+                             (expt x g))))
+                 s)))</pre></figure>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>s</th><th><span class="nc">γ</span> = 0.5</th><th><span class="nc">γ</span> = 1</th><th><span class="nc">γ</span> = 2</th><th><span class="nc">γ</span> = 3</th></tr></thead>
+          <tbody>
+            <tr><td>0.250</td><td>0.562</td><td>0.344</td><td>0.180</td><td>0.139</td></tr>
+            <tr><td>0.625</td><td>0.817</td><td>0.672</td><td>0.467</td><td>0.339</td></tr>
+            <tr><td>1.000</td><td>1.000</td><td>1.000</td><td>1.000</td><td>1.000</td></tr>
+            <tr><td>0.875</td><td>0.943</td><td>0.891</td><td>0.795</td><td>0.711</td></tr>
+            <tr><td>0.500</td><td>0.744</td><td>0.562</td><td>0.344</td><td>0.234</td></tr>
+            <tr><td>0.125</td><td>0.434</td><td>0.234</td><td>0.139</td><td>0.127</td></tr>
+            <tr><td>0.000</td><td>0.125</td><td>0.125</td><td>0.125</td><td>0.125</td></tr>
+            <tr><td>0.375</td><td>0.661</td><td>0.453</td><td>0.248</td><td>0.171</td></tr>
+          </tbody>
+          <tfoot><tr><td>sum</td><td>5.287</td><td>4.281</td><td>3.297</td><td>2.846</td></tr></tfoot>
+        </table>
+      </div>
+      <p class="tnote">The target is 4, so γ must lie somewhere between 1 and 2.</p>
+    </li>
+    <li>
+      <h3>Find γ by halving the search range</h3>
+      <p>The search starts with γ between 0.0001 and 10000. Each round tries the middle, measures the sum and keeps the half that must contain the answer:</p>
+      <p><strong>Sum too big</strong> → more bending needed → raise the lower limit (<code>g1 := m</code>). <strong>Otherwise</strong> → lower the upper limit (<code>g2 := m</code>).</p>
+      <p>The “middle” is the <em>geometric</em> mean √(g1 · g2), not the ordinary average. γ works by multiplication: 0.5 and 2 bend equally strongly in opposite directions. The ordinary average of 0.0001 and 10000 would be 5000, a useless first guess; the geometric mean is 1, a straight line.</p>
+      <figure class="code"><figcaption>LINES 126–132</figcaption><pre>(gamma (let ((g1 1d-4) (g2 1d4))
+         (dotimes (i 200 (sqrt (* g1 g2)))
+           (let ((m (sqrt (* g1 g2))))
+             (if (&gt; (reduce #'+ (funcall curve m))
+                    total)
+                 (setf g1 m)
+                 (setf g2 m))))))</pre></figure>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>round</th><th>g1</th><th>g2</th><th>m = √(g1·g2)</th><th>sum at m</th><th class="l">decision</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>0.0001</td><td>10000</td><td>1.000</td><td>4.281</td><td class="l">too big → g1 := 1.000</td></tr>
+            <tr><td>2</td><td>1.000</td><td>10000</td><td>100.0</td><td>1.875</td><td class="l">too small → g2 := 100.0</td></tr>
+            <tr><td>3</td><td>1.000</td><td>100.0</td><td>10.00</td><td>2.114</td><td class="l">too small → g2 := 10.00</td></tr>
+            <tr><td>4</td><td>1.000</td><td>10.00</td><td>3.162</td><td>2.796</td><td class="l">too small → g2 := 3.162</td></tr>
+            <tr><td>5</td><td>1.000</td><td>3.162</td><td>1.778</td><td>3.449</td><td class="l">too small → g2 := 1.778</td></tr>
+            <tr><td>6</td><td>1.000</td><td>1.778</td><td>1.334</td><td>3.851</td><td class="l">too small → g2 := 1.334</td></tr>
+            <tr><td>7</td><td>1.000</td><td>1.334</td><td>1.155</td><td>4.064</td><td class="l">too big → g1 := 1.155</td></tr>
+            <tr><td>8</td><td>1.155</td><td>1.334</td><td>1.241</td><td>3.957</td><td class="l">too small → g2 := 1.241</td></tr>
+            <tr><td class="dim">…</td><td class="dim"></td><td class="dim"></td><td class="dim"></td><td class="dim"></td><td class="l dim"></td></tr>
+            <tr><td>200</td><td colspan="2"></td><td>1.2054</td><td>4.0000000000</td><td class="l">done</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="tnote">In round 2 the sum is 1.875: with γ = 100 every value except the peak collapses to MIN (7 × 1/8 + 1). 200 rounds are far more than needed; double floats stop improving after about 60. The sum is now very close to 4, but still a float, not exact.</p>
+    </li>
+    <li>
+      <h3>Snap to the grid</h3>
+      <p>The bent values go to <code>fix-rounding</code> with the same quantize, MIN and MAX. Because their sum is already ≈ 4, the stretch in step 3 of fix-rounding changes almost nothing; the real work is rounding and repair: the floors add up to 29 of 32 units, so the three largest errors (values 2, 4 and 6) each receive one unit.</p>
+      <figure class="code"><figcaption>LINES 133–134</figcaption><pre>(fix-rounding (funcall curve gamma) total
+              :quantize quantize :min min :max max)</pre></figure>
+    </li>
+  </ol>
+
+  <h4 class="example">The whole trace</h4>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>#</th><th>contour</th><th>s</th><th>bent (<span class="nc">γ</span> 1.2054)</th><th>units</th><th>floor</th><th>err</th><th>move</th><th>result</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>2</td><td>0.250</td><td>0.290</td><td>2.316</td><td>2</td><td>0.316</td><td class="dim">·</td><td>1/4</td></tr>
+        <tr><td>2</td><td>5</td><td>0.625</td><td>0.622</td><td>4.972</td><td>4</td><td>0.972</td><td class="moved">+1</td><td>5/8</td></tr>
+        <tr><td>3</td><td>8</td><td>1.000</td><td>1.000</td><td>8.000</td><td>8</td><td>0.000</td><td class="dim">·</td><td>1</td></tr>
+        <tr><td>4</td><td>7</td><td>0.875</td><td>0.870</td><td>6.959</td><td>6</td><td>0.959</td><td class="moved">+1</td><td>7/8</td></tr>
+        <tr><td>5</td><td>4</td><td>0.500</td><td>0.504</td><td>4.035</td><td>4</td><td>0.035</td><td class="dim">·</td><td>1/2</td></tr>
+        <tr><td>6</td><td>1</td><td>0.125</td><td>0.196</td><td>1.571</td><td>1</td><td>0.571</td><td class="moved">+1</td><td>1/4</td></tr>
+        <tr><td>7</td><td>0</td><td>0.000</td><td>0.125</td><td>1.000</td><td>1</td><td>0.000</td><td class="dim">·</td><td>1/8</td></tr>
+        <tr><td>8</td><td>3</td><td>0.375</td><td>0.393</td><td>3.146</td><td>3</td><td>0.146</td><td class="dim">·</td><td>3/8</td></tr>
+      </tbody>
+      <tfoot><tr><td>Σ</td><td></td><td></td><td>4.000</td><td>32</td><td>29</td><td></td><td>+3</td><td>4</td></tr></tfoot>
+    </table>
+  </div>
+
+  <figure class="ruler-fig">
+    <div class="ruler-scroll">
+      <div class="ruler" role="img" aria-label="Contour 2 5 8 7 4 1 0 3 above the resulting durations 1/4 5/8 1 7/8 1/2 1/4 1/8 3/8 on a grid of 32 eighths">
+        <span class="cbar" style="grid-column: span 2"><i style="height:14px"></i></span>
+        <span class="cbar" style="grid-column: span 5"><i style="height:35px"></i></span>
+        <span class="cbar" style="grid-column: span 8"><i style="height:56px"></i></span>
+        <span class="cbar" style="grid-column: span 7"><i style="height:49px"></i></span>
+        <span class="cbar" style="grid-column: span 4"><i style="height:28px"></i></span>
+        <span class="cbar" style="grid-column: span 2"><i style="height:7px"></i></span>
+        <span class="cbar" style="grid-column: span 1"><i style="height:3px"></i></span>
+        <span class="cbar" style="grid-column: span 3"><i style="height:21px"></i></span>
+
+        <div class="blk a" style="grid-column: span 2">1/4</div>
+        <div class="blk b" style="grid-column: span 5">5/8</div>
+        <div class="blk a" style="grid-column: span 8">1</div>
+        <div class="blk b" style="grid-column: span 7">7/8</div>
+        <div class="blk a" style="grid-column: span 4">1/2</div>
+        <div class="blk b" style="grid-column: span 2">1/4</div>
+        <div class="blk a" style="grid-column: span 1">1/8</div>
+        <div class="blk b" style="grid-column: span 3">3/8</div>
+
+        <span class="tk bar"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span>
+        <span class="tk bar"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span>
+        <span class="tk bar"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span>
+        <span class="tk bar"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk"></span><span class="tk end"></span>
+
+        <span class="bn">1</span><span class="bn">2</span><span class="bn">3</span><span class="bn">4</span>
+      </div>
+    </div>
+    <figcaption>Top: the contour. Below: the durations it became, laid end to end on 32 eighth-units. Read as OMN lengths (1 = whole note) this is four 4/4 bars, numbered underneath. The peak (8) got MAX, the lowest point (0) got MIN.</figcaption>
+  </figure>
+</section>
+
+<!-- ======================================================= -->
+<section id="fit-sum-om">
+  <div class="sec-head">
+    <div class="label">Variant B · with Opusmodus functions</div>
+    <h2>fit-sum-om</h2>
+    <div class="sig">(fit-sum-om n total &amp;key min max quantize shape resolution) → ratios</div>
+  </div>
+
+  <details class="src" open>
+    <summary><span>Source · fit-sum-ratio.lisp, lines 136–172</span></summary>
+    <pre><span class="ln">136</span><span class="c">;;; --------------------------------------------------------</span>
+<span class="ln">137</span><span class="c">;;; Variant B -- with Opusmodus functions</span>
+<span class="ln">138</span><span class="c">;;;</span>
+<span class="ln">139</span><span class="c">;;; The same computation, but here the original chain does</span>
+<span class="ln">140</span><span class="c">;;; the work: gen-transition supplies the value table from</span>
+<span class="ln">141</span><span class="c">;;; MIN to MAX (its fourth parameter, the exponent, is the</span>
+<span class="ln">142</span><span class="c">;;; curvature control), vector-map maps the contour onto it.</span>
+<span class="ln">143</span><span class="c">;;; Only the exponent has to be found.</span>
+<span class="ln">144</span><span class="c">;;; RESOLUTION is nothing but the fineness of that table --</span>
+<span class="ln">145</span><span class="c">;;; the grid of the result comes from QUANTIZE.</span>
+<span class="ln">146</span><span class="c">;;; --------------------------------------------------------</span>
+<span class="ln">147</span>
+<span class="ln">148</span>(<span class="k">defun</span> fit-sum-om (n total &amp;key (min 1/8) (max 1)
+<span class="ln">149</span>                                (quantize '(1 2 4 8)) shape
+<span class="ln">150</span>                                (resolution 1000))
+<span class="ln">151</span>  (check-sum-range n total min max quantize)
+<span class="ln">152</span>  (<span class="k">let*</span> ((sh (<span class="k">or</span> shape (half-sine n 1 <span class="kw">:phase</span> 180)))
+<span class="ln">153</span>         (vals (<span class="k">lambda</span> (e)
+<span class="ln">154</span>                 (vector-map (gen-transition
+<span class="ln">155</span>                              (float min) (float max)
+<span class="ln">156</span>                              resolution e)
+<span class="ln">157</span>                             sh)))
+<span class="ln">158</span>         (total-at (<span class="k">lambda</span> (e)
+<span class="ln">159</span>                     (reduce <span class="f">#'+</span> (funcall vals e))))
+<span class="ln">160</span>         <span class="c">;; determine the direction -- independent of the</span>
+<span class="ln">161</span>         <span class="c">;; exponent convention</span>
+<span class="ln">162</span>         (down (&gt; (funcall total-at 0.01)
+<span class="ln">163</span>                  (funcall total-at 100.0)))
+<span class="ln">164</span>         (e (<span class="k">let</span> ((a 0.01) (b 100.0))
+<span class="ln">165</span>              (<span class="k">dotimes</span> (i 100 (sqrt (* a b)))
+<span class="ln">166</span>                (<span class="k">let</span> ((m (sqrt (* a b))))
+<span class="ln">167</span>                  (<span class="k">if</span> (eq (&gt; (funcall total-at m) total)
+<span class="ln">168</span>                          down)
+<span class="ln">169</span>                      (<span class="k">setf</span> a m)
+<span class="ln">170</span>                      (<span class="k">setf</span> b m)))))))
+<span class="ln">171</span>    (fix-rounding (funcall vals e) total
+<span class="ln">172</span>                  <span class="kw">:quantize</span> quantize <span class="kw">:min</span> min <span class="kw">:max</span> max)))</pre>
+  </details>
+  <p class="gist">Does the same job, but lets Opusmodus do the bending: a value table plus a lookup. Only the exponent has to be found.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Check the range and take the contour</h3>
+      <p>Identical to steps 1–2 of <code>fit-sum</code>. The contour is not normalised by hand here; the lookup in the next step takes care of that.</p>
+      <figure class="code"><figcaption>LINES 151–152</figcaption><pre>(check-sum-range n total min max quantize)
+(sh (or shape (half-sine n 1 :phase 180)))</pre></figure>
+    </li>
+    <li>
+      <h3>Build a value table and look the contour up in it</h3>
+      <p><code>gen-transition</code> produces a list of <code>resolution</code> (1000) numbers running from MIN to MAX; its fourth argument, the exponent <var>e</var>, sets the curvature, as the file’s comment describes. <code>vector-map</code> then maps the contour onto that list: the lowest contour point picks the first entry (MIN), the highest picks the last (MAX), everything in between proportionally.</p>
+      <p>That is the <var>s</var><sup>γ</sup> curve of <code>fit-sum</code>, in lookup form. <code>resolution</code> only sets how fine the table is (999 steps between MIN and MAX); the rhythmic grid still comes from <code>quantize</code>.</p>
+      <figure class="code"><figcaption>LINES 153–157</figcaption><pre>(vals (lambda (e)
+        (vector-map (gen-transition
+                     (float min) (float max)
+                     resolution e)
+                    sh)))</pre></figure>
+    </li>
+    <li>
+      <h3>The sum as a function of the exponent</h3>
+      <p><code>total-at</code> builds the values for a given <var>e</var> and adds them up. This is the quantity the search has to steer to <var>total</var>.</p>
+      <figure class="code"><figcaption>LINES 158–159</figcaption><pre>(total-at (lambda (e)
+            (reduce #'+ (funcall vals e))))</pre></figure>
+    </li>
+    <li>
+      <h3>Find out which way the dial turns</h3>
+      <p>The sums at a very small (0.01) and a very large (100) exponent are compared. <code>down</code> is <code>T</code> if a larger exponent gives a smaller sum. Asking the function instead of assuming means the code works however <code>gen-transition</code> interprets its exponent.</p>
+      <figure class="code"><figcaption>LINES 162–163</figcaption><pre>(down (&gt; (funcall total-at 0.01)
+         (funcall total-at 100.0)))</pre></figure>
+    </li>
+    <li>
+      <h3>Halve the search range</h3>
+      <p>The same geometric halving as in <code>fit-sum</code>, between 0.01 and 100, for 100 rounds. The decision is packed into one line: <code>(eq (&gt; sum total) down)</code> asks “do both answers agree?”. When they agree, the exponent has to go up (<code>a := m</code>); otherwise down (<code>b := m</code>).</p>
+      <figure class="code"><figcaption>LINES 164–170</figcaption><pre>(e (let ((a 0.01) (b 100.0))
+     (dotimes (i 100 (sqrt (* a b)))
+       (let ((m (sqrt (* a b))))
+         (if (eq (&gt; (funcall total-at m) total)
+                 down)
+             (setf a m)
+             (setf b m))))))</pre></figure>
+      <div class="tbl truth">
+        <table>
+          <thead><tr><th class="l">down</th><th class="l">sum &gt; total?</th><th class="l">eq gives</th><th class="l">action</th><th class="l">because</th></tr></thead>
+          <tbody>
+            <tr><td>T</td><td class="l">yes</td><td class="l">T</td><td class="l">a := m</td><td class="l">a larger exponent lowers the sum</td></tr>
+            <tr><td>T</td><td class="l">no</td><td class="l">NIL</td><td class="l">b := m</td><td class="l">a smaller exponent raises it</td></tr>
+            <tr><td>NIL</td><td class="l">yes</td><td class="l">NIL</td><td class="l">b := m</td><td class="l">a smaller exponent lowers the sum</td></tr>
+            <tr><td>NIL</td><td class="l">no</td><td class="l">T</td><td class="l">a := m</td><td class="l">a larger exponent raises it</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </li>
+    <li>
+      <h3>Snap to the grid</h3>
+      <p>Exactly as in <code>fit-sum</code>: the looked-up values go to <code>fix-rounding</code>.</p>
+      <figure class="code"><figcaption>LINES 171–172</figcaption><pre>(fix-rounding (funcall vals e) total
+              :quantize quantize :min min :max max)</pre></figure>
+    </li>
+  </ol>
+
+  <h4 class="example">Tested with stand-ins</h4>
+  <p>With a stand-in <code>gen-transition</code> (MIN + (MAX − MIN) · (i/999)<sup>e</sup>) and a proportional <code>vector-map</code>, the example contour gave <strong>(1/4 5/8 1 7/8 1/2 1/4 1/8 3/8)</strong> — identical to <code>fit-sum</code> — and the same result again when the stand-in’s exponent was reversed, which confirms the direction test. With the real Opusmodus functions the two variants can differ slightly, because <code>gen-transition</code>’s curve need not be exactly <var>s</var><sup>γ</sup>. The single-float search limits (0.01, 100.0) are less precise than <code>fit-sum</code>’s doubles, which fix-rounding makes irrelevant.</p>
+</section>
+
+<!-- ======================================================= -->
+<section id="notes">
+  <div class="sec-head">
+    <div class="label">Review</div>
+    <h2 class="serif">Things worth knowing</h2>
+  </div>
+  <p>The sum is exact in every case tested. These points concern edge cases and wording, not the core calculation.</p>
+
+  <div class="notes">
+    <div class="note">
+      <h3>MIN and MAX are limits, not promises</h3>
+      <p>The docstring says “smallest value MIN, largest value MAX”. Every value stays inside those limits, but they do not always <em>appear</em>. The curve pins every lowest contour point to MIN and every highest one to MAX. With <var>c</var><sub>0</sub> lowest and <var>c</var><sub>1</sub> highest points, bending can only reach sums between</p>
+      <div class="formula">(<var>n</var> − <var>c</var><sub>1</sub>) · min + <var>c</var><sub>1</sub> · max &nbsp;and&nbsp; <var>c</var><sub>0</sub> · min + (<var>n</var> − <var>c</var><sub>0</sub>) · max</div>
+      <p>If the target lies outside, γ runs to the end of its search range and fix-rounding has to shorten the longest or lengthen the shortest values. Example: <code>(fit-sum 20 19 :shape '(0 1 2 … 9 9 … 2 1 0))</code> gives first and last values of 1/2, not 1/8. In a test with 2000 random contours (13 levels, <var>n</var> from 8 to 64, total 8) the sum was exact every time; MAX was missing in 741 results and MIN in 38, and every one of those cases lay outside this range. Contours with many repeated top or bottom values are affected most. At the ends of the <var>n</var> range (8 or 64 for total 8) every value is forced to MAX or MIN and the contour disappears entirely.</p>
+    </div>
+
+    <div class="note">
+      <h3>A total that is not on the grid is rounded silently</h3>
+      <p><code>steps</code> is <code>(round (/ total unit))</code>. <code>(fix-rounding '(1 2 3) 4.1 :quantize '(1 2 4))</code> returns values summing to 4, and a total of 7/8 on a quarter grid gives 1 (3.5 units round to the even 4). A guard after line 41 would make this visible:</p>
+      <pre>(assert (= steps (/ total unit)) ()
+        "Total ~a is not on the ~a grid."
+        total unit)</pre>
+    </div>
+
+    <div class="note">
+      <h3>Ties depend on the Lisp</h3>
+      <p>Common Lisp’s <code>sort</code> does not promise to keep equal elements in their original order. SBCL happens to (value 1 beat value 3 in the fix-rounding trace), but another implementation may not. For identical results everywhere, use <code>stable-sort</code> on line 60:</p>
+      <pre>(stable-sort (loop for k from 0 below n collect k)
+             (if (plusp rest) #'&gt; #'&lt;)
+             :key (lambda (k) (nth k err)))</pre>
+    </div>
+
+    <div class="note">
+      <h3>The “units left over” error can never fire</h3>
+      <p>Once the assert on line 52 has passed and rest is positive, the values sum to less than steps ≤ <var>n</var> · hi, so at least one of them is below <code>hi</code> and can take a unit; the mirror argument holds for negative rest. Every pass therefore moves something. The error on lines 74–77 is a harmless safety net.</p>
+    </div>
+
+    <div class="note">
+      <h3>The assert restart cannot fix the total</h3>
+      <p>Both asserts name <code>(total)</code> as a place, so the debugger offers to enter a new total. But the test uses <code>steps</code>, which was computed before the assert and is not recomputed, so the new value is ignored and the assert fails again. Writing <code>()</code> instead of <code>(total)</code> avoids the misleading offer.</p>
+    </div>
+
+    <div class="note">
+      <h3>“Everything stays rational” — at the ends</h3>
+      <p>The header comment holds for <code>fix-rounding</code> with ratio input, and for every final result. Inside <code>fit-sum</code> and <code>fit-sum-om</code> the curve is computed in floats; the exactness comes from counting whole units at the end.</p>
+    </div>
+
+    <div class="note">
+      <h3>Which note value is 1?</h3>
+      <p>Line 186 reads <code>(fit-sum 20 8)</code> as “8 quarters (two 4/4 bars), 1/8 … 1, on an eighth grid”. In OMN lengths 1 is a whole note, so <code>make-omn</code> on line 217 will read the result as eight whole notes — eight 4/4 bars, with values from an eighth to a whole note. That matches “eighth grid” but not “two 4/4 bars”. If two bars were intended, the result needs scaling by 1/4 before it goes into the score.</p>
+    </div>
+  </div>
+
+  <footer class="src">
+    <p><span class="label">Method</span> Every number on this page comes from running the file’s functions in SBCL 2.2.9, with contours given explicitly.</p>
+    <p><span class="label">Sources</span> <code>half-sine</code> parameters: <a href="https://opusmodus.com/forums/topic/856-opusmodus-1222215/">Opusmodus 1.2 release notes</a>. <code>gen-transition</code> and <code>vector-map</code> are described as the file’s own comments use them; no public reference page was found to confirm further details.</p>
+  </footer>
+</section>
+
+</main>
+</div>
+
+</body>
+</html>

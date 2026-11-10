@@ -1,0 +1,11 @@
+(defun rehearsal-mark (omn-exp)
+  “Add a rehearsal mark even on the empty measures.”
+  (if (event-restp (nth-event 0 omn-exp))
+    (position-insert 1 'reh omn-exp :section '(0))
+  (edit-events '((1 1 'reh :articulation)) omn-exp)))
+
+(setf omn '((h. d4fs4bb4 ff q eb4gs4 h. d4fs4bb4 pp q d4f4bb4eb5 ff h c4eb4gs4 f q eb4 ff h cs4 mf -q h. d4fs4bb4c5 q d4f4bb4f5 ff d4fs4bb4c5 cs4fs4a4 pp eb4f4 f c4eb4gs4b4 mf eb4f4 h. c4e4fs4bb4d5 f q cs4fs4a4 mp d4f4bb4eb5f5 mf h cs4f4g4bb4eb5g5 mp p w mp) (s c4 ff h c4eb4 s cs4 -e s gs4 t eb4 -wet e cs4 f s a4 -qs t eb4 ff -51/160 5q eb4 -5d. h. d4fs4bb4c5 mf s c4gs4 ff g5 cs4 eb4fs4 q d4fs4bb4c5 cs4fs4a4 pp eb4f4 f c4eb4gs4b4 mf -5q 5q cs4 -5q 5q g4 -5q h. c4e4fs4bb4d5 f s fs4 mp a4 -t t cs4 -s q d4f4bb4eb5f5 mf h cs4f4g4bb4eb5g5 mp p w mp) (h. d4fs4bb4 ff q eb4gs4 h. d4fs4bb4 pp q d4f4bb4eb5 ff e cs4 f e4 g4 f4 q eb4 ff -q s cs4 -s s cs4 -ws 3e bb4 f4 d4 -e q d4fs4bb4c5 cs4fs4a4 pp eb4f4 f c4eb4gs4b4 mf 3e eb4 -3he e. d4e5 f b4 d4 eb4f4 q cs4fs4a4 mp d4f4bb4eb5f5 mf b5gs6gs5 mp e. gs4b4gs5d4 s bb4cs4eb5 -e. q cs4bb4cs5 -e. q cs4 s g4 e bb4 e. f4 -q) (e cs4e4gs4c5 ff c4eb4g4b4 c4e4gs4 c4e4gs4 cs4f4a4 cs4e4gs4c5 -5h 5q b4fs4d4 cs4 c5g4eb4 e c4e4gs4 pp c4eb4g4b4 cs4e4gs4c5 cs4f4a4 c4e4gs4 c4eb4g4b4 5q e6b5fs5eb5b4g4 ff d6a5e5cs5a4f4 e5b4fs4eb4 eb5bb4f4d4 eb5bb4f4d4 h c4eb4gs4 f -5w 5q c4 h cs4 mf 5q b4g4eb4cs4 p -5h. 5q a4f4cs4 h. d4fs4bb4c5 mf q d4f4bb4f5 ff 7q c5bb4fs4d4 c5bb4fs4d4 c5bb4fs4d4 c5bb4fs4d4 c5bb4fs4d4 c5bb4fs4d4 c5bb4fs4d4 a4fs4cs4 pp a4fs4cs4 a4fs4cs4 a4fs4cs4 a4fs4cs4 a4fs4cs4 a4fs4cs4 eb4f4 f eb4f4 eb4f4 eb4f4 eb4f4 eb4f4 eb4f4 c4eb4gs4b4 c4eb4gs4b4 c4eb4gs4b4 c4eb4gs4b4 c4eb4gs4b4 c4eb4gs4b4 c4eb4gs4b4 q eb4f4 mf h. c4e4fs4bb4d5 f 5q bb5g5d5bb4g4 mp gs5f5c5gs4f4 bb4g4d4 a4fs4cs4 a4fs4cs4 7q f5eb5bb4f4d4 f5eb5bb4f4d4 f5eb5bb4f4d4 f5eb5bb4f4d4 f5eb5bb4f4d4 f5eb5bb4f4d4 f5eb5bb4f4d4 h cs4f4g4bb4eb5g5 cs4f4g4bb4eb5g5 p w mp) (s b4eb4c4 ff -e q. gs4e4 e. f4a4 -et s eb4 t gs4 e. e4c4 pp s b4 -q. s c5cs4 -s t eb5 ff bb4 -t t f4 d4 -e.. s f4 f -e s a4cs4 -h.s s d4 -q h. d4fs4bb4c5 mf s c4c5 ff e5 eb5 fs4fs5 q d4fs4bb4c5 cs4fs4a4 pp eb4f4 f c4eb4gs4b4 mf -q h. c4e4fs4bb4d5 f t a4 mp fs4 -t t cs4 -e q d4f4bb4eb5f5 mf h cs4f4g4bb4eb5g5 mp p w mp)))
+
+(setf piano-rh.rea (assemble-seq
+                    (loop for i in omn
+                          :collect (rh-mark (list i)))))
