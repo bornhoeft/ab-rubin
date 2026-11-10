@@ -36,3 +36,4 @@
 
 # ignore lib directories
 lib/
+musicxml/
