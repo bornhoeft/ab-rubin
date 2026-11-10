@@ -9,5 +9,6 @@ Achim Bornhoeft © 2026<br>
 ## TOC
 
 - [Live Electronics](puredata/) (Pure Data - Pd 0.56.2 Vanilla)
+- [Rubin - The Electronics](puredata/doc/Rubin-Pd-Electronics.md) 
 - [Computercomposition](opmo/) (Opusmodus - Version 4.0.33573)
 

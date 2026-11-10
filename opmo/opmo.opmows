@@ -3,7 +3,7 @@
 )
 
 ("workspace-view/history"
- (("score.opmo" "score.opmo"))
+ (("rubin.opmo" "rubin.opmo"))
 )
 
 ("workspace-view/node-documents"
@@ -11,7 +11,7 @@
 )
 
 ("workspace-view/current"
- "score.opmo"
+ "rubin.opmo"
 )
 
 ("workspace-view/navigator-display-states"

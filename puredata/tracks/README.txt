@@ -1,0 +1,1 @@
+Download the audio files with the release from https://github.com/bornhoeft/ab-rubin/releases
